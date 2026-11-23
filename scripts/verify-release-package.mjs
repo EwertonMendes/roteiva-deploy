@@ -6,7 +6,7 @@ import {verifySource} from './verify-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe']);
+const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe','ee8c582f39c1bd4aeadbe86a663f7b862f968c3a']);
 
 export async function verifyRelease({api,requestedSha,packageRunId,target}){
  if(!['dev','prod'].includes(target))throw Error('Invalid release target');
@@ -22,7 +22,8 @@ export async function verifyRelease({api,requestedSha,packageRunId,target}){
  const run=await api('/actions/runs/'+packageRunId);
  if(run.id!==Number(packageRunId)||run.workflow_id!==WORKFLOW_ID||
     run.head_sha!==requestedSha||run.head_branch!=='master'||
-    run.event!=='workflow_dispatch'||run.conclusion!=='success'||run.status!=='completed'||
+    !(run.event==='workflow_dispatch'||(target==='dev'&&run.event==='workflow_run'))||
+    run.conclusion!=='success'||run.status!=='completed'||
     run.repository?.id!==SOURCE_ID||run.head_repository?.id!==SOURCE_ID||
     run.actor?.id!==OWNER_ID)
   throw Error('Package execution lacks immutable owner/source/target provenance');
