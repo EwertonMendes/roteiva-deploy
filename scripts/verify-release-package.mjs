@@ -6,7 +6,7 @@ import {verifySource} from './verify-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const WORKFLOW_BLOBS=new Set(['9922e7489011e4fb776ec6be25e7d3a1d77235a7']);
+const WORKFLOW_BLOBS=new Set(['70f72c10dab83307f37bd91b1ee4346790dec955']);
 
 export async function verifyRelease({api,requestedSha,packageRunId,target}){
  if(!['dev','prod'].includes(target))throw Error('Invalid release target');
