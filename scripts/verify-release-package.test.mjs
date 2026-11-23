@@ -27,7 +27,7 @@ function fixture(options={}){
    '03 - E2E Projects, finance, Drive & approvals'
    ].map(name=>({name,status:'completed',conclusion:'success'}))};
   if(path==='/actions/runs/'+runId)return {id:runId,workflow_id:id,head_sha:sha,head_branch:'master',
-   status:'completed',conclusion:'success',event:'workflow_dispatch',repository:source,
+   status:'completed',conclusion:'success',event:options.runEvent||'workflow_dispatch',repository:source,
    head_repository:source,actor:options.actor||owner,
    };
   if(path.includes('/actions/runs/'+runId+'/jobs'))return {jobs:[{
@@ -55,4 +55,11 @@ test('rejects incorrect environment, malformed run ID and master race',async()=>
  await assert.rejects(verifyRelease({api:fixture(),requestedSha:sha,packageRunId:runId,target:'prod'}));
  await assert.rejects(verifyRelease({api:fixture(),requestedSha:sha,packageRunId:'-1',target:'dev'}));
  await assert.rejects(verifyRelease({api:fixture({staleAtEnd:true}),requestedSha:sha,packageRunId:runId,target:'dev'}));
+});
+
+test('allows reviewed automatic package only for DEV, not production',async()=>{
+ const dev=await verifyRelease({api:fixture({runEvent:'workflow_run'}),requestedSha:sha,packageRunId:runId,target:'dev'});
+ assert.equal(dev.artifactId,432100);
+ await assert.rejects(verifyRelease({api:fixture({runEvent:'workflow_run'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
+ await assert.rejects(verifyRelease({api:fixture({runEvent:'push'}),requestedSha:sha,packageRunId:runId,target:'dev'}));
 });
