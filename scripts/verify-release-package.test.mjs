@@ -18,7 +18,7 @@ function fixture(options={}){
   if(path==='/actions/workflows/428216408')return {id:428216408,path:'.github/workflows/qa-production-gates.yml',state:'active'};
   if(path.includes('qa-production-gates.yml'))return {sha:'9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d'};
   if(path==='/actions/workflows/'+id)return {id,path:'.github/workflows/release-package.yml',state:'active'};
-  if(path.includes('release-package.yml'))return {sha:options.blob||'70f72c10dab83307f37bd91b1ee4346790dec955'};
+  if(path.includes('release-package.yml'))return {sha:options.blob||'a34d722b2cf8ae56870f46f2ede8fc0046c3be99'};
   if(path.includes('428216408/runs'))return {workflow_runs:[{id:45278221929,status:'completed',conclusion:'success',
    workflow_id:428216408,head_branch:'master',head_sha:sha,event:'push',repository:source,head_repository:source}]};
   if(path.includes('/actions/runs/45278221929/jobs'))return {jobs:[
