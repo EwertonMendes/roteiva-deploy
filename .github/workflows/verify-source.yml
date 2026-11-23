@@ -1,0 +1,33 @@
+name: Verify release source
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full source master SHA
+        required: true
+        type: string
+      public_probe:
+        description: Permit the public-source rehearsal
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: verify-release-source
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository_id == '1469367994' && github.ref == 'refs/heads/master' && github.actor_id == '33728924'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: source-read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Verify immutable source and finished CI
+        env:
+          RELEASE_SHA: ${{ inputs.sha }}
+          PUBLIC_PROBE: ${{ inputs.public_probe }}
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+        run: node scripts/verify-source.mjs

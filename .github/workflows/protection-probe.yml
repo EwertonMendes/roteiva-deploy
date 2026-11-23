@@ -1,0 +1,42 @@
+name: Exercise environment protection
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Protection configuration to exercise
+        required: true
+        type: choice
+        options: [development, production]
+permissions: {}
+concurrency:
+  group: environment-protection-probe
+  cancel-in-progress: false
+jobs:
+  cloudflare-development:
+    if: github.repository_id == '1469367994' && github.ref == 'refs/heads/master' && github.actor_id == '33728924' && inputs.target == 'development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: cloudflare-development
+    steps:
+      - run: echo 'Cloudflare DEV environment reached'
+  firebase-development:
+    needs: cloudflare-development
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: firebase-development
+    steps:
+      - run: echo 'Firebase DEV environment reached'
+  cloudflare-production:
+    if: github.repository_id == '1469367994' && github.ref == 'refs/heads/master' && github.actor_id == '33728924' && inputs.target == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: cloudflare-production
+    steps:
+      - run: echo 'Cloudflare PROD approval recorded. This is a rehearsal.'
+  firebase-production:
+    needs: cloudflare-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: firebase-production
+    steps:
+      - run: echo 'Firebase PROD approval recorded. This is a rehearsal.'
