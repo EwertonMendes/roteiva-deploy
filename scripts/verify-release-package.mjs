@@ -6,7 +6,7 @@ import {verifySource} from './verify-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const WORKFLOW_BLOBS=new Set(['a34d722b2cf8ae56870f46f2ede8fc0046c3be99']);
+const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe']);
 
 export async function verifyRelease({api,requestedSha,packageRunId,target}){
  if(!['dev','prod'].includes(target))throw Error('Invalid release target');
@@ -17,12 +17,14 @@ export async function verifyRelease({api,requestedSha,packageRunId,target}){
   throw Error('The reviewed packaging workflow is unavailable');
  const revision=await api('/contents/'+WORKFLOW_PATH+'?ref='+requestedSha);
  if(!WORKFLOW_BLOBS.has(revision.sha))throw Error('Source package workflow requires independent controller review');
+ // REST GET /actions/runs/{id} omits workflow_dispatch inputs. Instead bind
+ // immutable SHA, target and owner through run metadata, job and artifact name.
  const run=await api('/actions/runs/'+packageRunId);
  if(run.id!==Number(packageRunId)||run.workflow_id!==WORKFLOW_ID||
     run.head_sha!==requestedSha||run.head_branch!=='master'||
     run.event!=='workflow_dispatch'||run.conclusion!=='success'||run.status!=='completed'||
     run.repository?.id!==SOURCE_ID||run.head_repository?.id!==SOURCE_ID||
-    run.actor?.id!==OWNER_ID||run.inputs?.target!==target||run.inputs?.sha!==requestedSha)
+    run.actor?.id!==OWNER_ID)
   throw Error('Package execution lacks immutable owner/source/target provenance');
  const jobs=await api('/actions/runs/'+packageRunId+'/jobs?filter=latest&per_page=100');
  const packaging=jobs.jobs?.filter(j=>j.name==='Source-only release package ('+target+')');
