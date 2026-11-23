@@ -6,6 +6,15 @@ on:
         description: Full source master SHA
         required: true
         type: string
+      package_run_id:
+        description: Source package workflow run ID, for read-only artifact rehearsal
+        type: string
+        required: false
+      target:
+        description: Expected package target
+        type: choice
+        options: [dev, prod]
+        default: dev
       public_probe:
         description: Permit the public-source rehearsal
         type: boolean
@@ -31,3 +40,11 @@ jobs:
           PUBLIC_PROBE: ${{ inputs.public_probe }}
           SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
         run: node scripts/verify-source.mjs
+      - name: Verify SHA, download private release artifact and validate every file without deploying
+        if: inputs.package_run_id != ''
+        env:
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+          RELEASE_SHA: ${{ inputs.sha }}
+          RELEASE_TARGET: ${{ inputs.target }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+        run: node scripts/download-verified-release.mjs
