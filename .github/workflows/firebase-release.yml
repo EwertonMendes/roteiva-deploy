@@ -203,3 +203,90 @@ jobs:
         run: |
           node scripts/guard-secrets.mjs "$RELEASE_TARGET"
           node ../scripts/smoke-environment.mjs "$RELEASE_TARGET"
+
+  firebase:
+    name: Publish Firebase Hosting and Firestore (protected OIDC)
+    needs: [preflight, worker]
+    if: >-
+      !cancelled() && needs.preflight.result == 'success' &&
+      (needs.worker.result == 'success' || (inputs.frontend_only && needs.worker.result == 'skipped'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: firebase-${{ inputs.target }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+      RELEASE_SHA: ${{ inputs.sha }}
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
+      DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
+      PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
+      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
+      PRODUCTION_BILLING_PIX_ENABLED: ${{ vars.PRODUCTION_BILLING_PIX_ENABLED }}
+      PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release source again after approval and unpack immutable artifact
+        id: bundle
+        run: node scripts/download-verified-release.mjs
+      - name: Reject cross-environment Firebase publication
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          test "$FIREBASE_PROJECT_ID" = "roteiva-web-$RELEASE_TARGET"
+          node --input-type=module -e "import fs from 'node:fs';const m=JSON.parse(fs.readFileSync(process.argv[1]));if(m.projectId!==process.env.FIREBASE_PROJECT_ID)process.exit(1)" "${{ steps.bundle.outputs.release_path }}/release-manifest.json"
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        id: identity
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.FIREBASE_PROJECT_ID }}
+          token_format: access_token
+          access_token_lifetime: 600s
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Verify OIDC trust and Firebase environment boundaries
+        env:
+          ACCESS_TOKEN: ${{ steps.identity.outputs.access_token }}
+          TARGET: ${{ inputs.target }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: node scripts/verify-firebase-identity.mjs
+      - name: Install pinned Firebase CLI
+        run: npm install --global --ignore-scripts --no-audit --no-fund firebase-tools@15.34.0
+      - name: Deploy Hosting and optionally reviewed Firestore rules/indexes
+        working-directory: ${{ steps.bundle.outputs.release_path }}
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+        run: |
+          set -euo pipefail
+          if [ "$FRONTEND_ONLY" = true ] || [ "$DOMAIN_CUTOVER" = true ]; then
+            only="hosting:roteiva-web-$RELEASE_TARGET"
+          elif [ "$RELEASE_TARGET" = prod ]; then
+            only="firestore:rules,firestore:indexes,hosting:roteiva-web-prod"
+          else
+            only="firestore:rules,firestore:indexes,hosting:roteiva-web-dev"
+          fi
+          firebase deploy --config firebase.json --only "$only" --project "$FIREBASE_PROJECT_ID" --non-interactive
+      - name: Smoke-check deployed domain, auth handler and Worker
+        working-directory: ${{ steps.bundle.outputs.release_path }}
+        env:
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_TARGET" = prod ]; then
+            node scripts/verify-hosting-cache.mjs https://app.roteiva.com
+            node scripts/verify-domain-app.mjs
+          else
+            node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app
+          fi
+          if [ "$FRONTEND_ONLY" != true ]; then node scripts/smoke-environment.mjs "$RELEASE_TARGET"; fi
