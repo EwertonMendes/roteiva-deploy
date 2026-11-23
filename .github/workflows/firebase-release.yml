@@ -270,11 +270,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$FRONTEND_ONLY" = true ] || [ "$DOMAIN_CUTOVER" = true ]; then
-            only="hosting:roteiva-web-$RELEASE_TARGET"
+            if [ "$RELEASE_TARGET" = dev ]; then only="hosting"; else only="hosting:roteiva-web-prod"; fi
           elif [ "$RELEASE_TARGET" = prod ]; then
             only="firestore:rules,firestore:indexes,hosting:roteiva-web-prod"
           else
-            only="firestore:rules,firestore:indexes,hosting:roteiva-web-dev"
+            only="firestore:rules,firestore:indexes,hosting"
           fi
           firebase deploy --config firebase.json --only "$only" --project "$FIREBASE_PROJECT_ID" --non-interactive
       - name: Smoke-check deployed domain, auth handler and Worker
