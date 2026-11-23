@@ -17,12 +17,14 @@ export async function verifyRelease({api,requestedSha,packageRunId,target}){
   throw Error('The reviewed packaging workflow is unavailable');
  const revision=await api('/contents/'+WORKFLOW_PATH+'?ref='+requestedSha);
  if(!WORKFLOW_BLOBS.has(revision.sha))throw Error('Source package workflow requires independent controller review');
+ // REST GET /actions/runs/{id} omits workflow_dispatch inputs. Instead bind
+ // immutable SHA, target and owner through run metadata, job and artifact name.
  const run=await api('/actions/runs/'+packageRunId);
  if(run.id!==Number(packageRunId)||run.workflow_id!==WORKFLOW_ID||
     run.head_sha!==requestedSha||run.head_branch!=='master'||
     run.event!=='workflow_dispatch'||run.conclusion!=='success'||run.status!=='completed'||
     run.repository?.id!==SOURCE_ID||run.head_repository?.id!==SOURCE_ID||
-    run.actor?.id!==OWNER_ID||run.inputs?.target!==target||run.inputs?.sha!==requestedSha)
+    run.actor?.id!==OWNER_ID)
   throw Error('Package execution lacks immutable owner/source/target provenance');
  const jobs=await api('/actions/runs/'+packageRunId+'/jobs?filter=latest&per_page=100');
  const packaging=jobs.jobs?.filter(j=>j.name==='Source-only release package ('+target+')');
