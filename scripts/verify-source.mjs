@@ -7,7 +7,10 @@ const OWNER_ID = 33_728_924;
 const BRANCH = 'master';
 const WORKFLOW_ID = 428_216_408;
 const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
-const WORKFLOW_BLOB = 'e251344637b6edecac7469244d745272a9a68dd9';
+const WORKFLOW_BLOBS = new Set([
+  'e251344637b6edecac7469244d745272a9a68dd9',
+  '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d',
+]);
 const REQUIRED_JOBS = [
   '01 - Quality, security & production build',
   '02 - E2E Access, billing & tenant isolation',
@@ -46,7 +49,7 @@ export async function verifySource({ api, requestedSha, publicProbe }) {
   requireThat(workflow.id === WORKFLOW_ID && workflow.path === WORKFLOW_PATH && workflow.state === 'active',
     'The approved release workflow is unavailable.');
   const revision = await api('/contents/' + WORKFLOW_PATH + '?ref=' + requestedSha);
-  requireThat(revision.sha === WORKFLOW_BLOB, 'The release workflow implementation requires controller review.');
+  requireThat(WORKFLOW_BLOBS.has(revision.sha), 'The release workflow implementation requires controller review.');
 
   const filters = new URLSearchParams({ branch: BRANCH, event: 'push', head_sha: requestedSha, per_page: '10' });
   const runs = await api('/actions/workflows/' + WORKFLOW_ID + '/runs?' + filters);
