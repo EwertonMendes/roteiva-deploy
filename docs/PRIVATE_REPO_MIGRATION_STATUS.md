@@ -1,8 +1,8 @@
 # Roteiva — migração para repositório privado
 
-## Estado verificado em 24/11/2026 UTC
+## Estado verificado em 23/11/2026, horário de Brasília
 
-**Não declarar a migração concluída antes da virada e dos testes do runner real no repositório privado.** A origem ainda está pública. Os serviços DEV e PROD continuam operacionais.
+`roteiva-web` está privado e `roteiva-deploy` continua público. A origem privada já executa no pool local e gera pacotes imutáveis. As evidências abaixo registram ensaios anteriores e posteriores à virada. A homologação de cada SHA exige os checks e a procedência correspondentes.
 
 ### Evidências
 
@@ -21,10 +21,11 @@ PRs de origem #227 e #228 e de controlador #7, #8 e #9 integrados. A origem em m
 
 ### Arquitetura
 
-- `roteiva-web`: código, CI, pacotes, artefatos e logs de compilação. O runner local será registrado somente depois da origem privada, sem credenciais de publicação de repositório.
+- `roteiva-web`: código, CI, pacotes, artefatos e logs de compilação. O pool usa VMs Linux efêmeras sob demanda, sem credenciais de publicação de repositório. O perfil de empacotamento leve reduz concorrência com as suítes que usam emuladores.
 - `roteiva-deploy`: política de release, aprovação e publicação temporária em GitHub-hosted runners. Nenhum pacote de origem é armazenado como artefato do controlador público. Metadados de release (SHA e IDs) são públicos.
 - Após um push na master privada com gates verdes, o workflow source-only gera o pacote DEV. O controlador verifica periodicamente o pacote **concluído**. Não há PAT de escrita entre os repositórios. O receipt impede repetir o mesmo SHA ou desfazer uma promoção manual de PR. O proprietário pode reexecutar manualmente um release após falha.
 - PROD continua exigindo o SHA atual, gates, pacote verificável e as aprovações cloudflare-production e firebase-production.
+- A extração confere o digest do pacote e a revisão exata dos scripts de publicação, lockfiles e configurações que serão usados com credenciais. Alterações nesses arquivos exigem revisão própria no controlador. Worker compilado, conteúdo estático e migrações seguem suas verificações de release e ambiente.
 - Os jobs legados da origem que dependem dos environments de publicação são guardados contra execução privada. Não remover suas validações de PR.
 
 ## Operação dos fluxos
@@ -51,18 +52,11 @@ Os conectores não podem alterar visibilidade do repositório, registrar runner 
 
 - `firebase-ops.yml` na origem: privado somente, GitHub-hosted, owner/manual/master; OIDC separado de deploy, projeto DEV, `FIREBASE_DATA_WIF_PROVIDER`, `FIREBASE_DATA_SERVICE_ACCOUNT`, `FIREBASE_DATA_OPS_ENABLED=true`. Conta `roteiva-private-dev-ops@roteiva-web-dev.iam.gserviceaccount.com`, papel Datastore User. Provedor restrito a ID da origem, ID do proprietário/ator, workflow ref, evento manual, runner github-hosted e visibilidade private. Não usar a identidade de Hosting.
 - `prod-qa-access.yml` no controlador: source package verificado, ambiente cloudflare-production protegido, apenas conta de QA já autorizada por hash. `GCP_QA_WIF_PROVIDER`, `GCP_QA_SERVICE_ACCOUNT` (conta `roteiva-private-prod-qa@roteiva-web-prod.iam.gserviceaccount.com`), `QA_PROD_TARGET_EMAIL` (secret, nunca input público). OIDC dedicado e restrito ao ID do controlador, workflow ref exato, owner/manual/master, runner GitHub-hosted e environment cloudflare-production. Usar primeiro `action=check`, nunca expirar/restaurar só para ensaio.
-- As duas identidades usam tokens curtos e não substituem as chaves de runtime do Roteiva. A autorização IAM e o secret precisam ser criados pelo proprietário em seu PC; a configuração ainda não foi executada/validada de ponta a ponta.
+- As duas identidades usam tokens curtos. A checagem protegida de QA PROD e a contagem de uma coleção sintética em DEV passaram com as identidades dedicadas. As chaves de runtime continuam sob custódia do provedor.
 
-### Virada final (somente após validação)
+### Operação após a virada
 
-1. Conferir os checks finais, a publicação DEV pelo controlador e o PROD aprovado. Validar operação QA protegida read-only e preparar DEV data OIDC.
-2. Verificar backup local e destino do GitHub Pages histórico (o site/app atual usa Firebase e Cloudflare). Preservar os valores de runtime e configurações de billing/OAuth.
-3. Confirmar que a origem não tem secrets de repositório de publicação; remover apenas o `FIREBASE_SERVICE_ACCOUNT` legado de escopo de repositório após confirmação de backup e transferência. Não apagar indiscriminadamente secrets ou environments.
-4. Alterar visibilidade somente de `roteiva-web` para PRIVATE. Manter `roteiva-deploy` PUBLIC. Não reverter automaticamente para público em caso de problema.
-5. Confirmar `ROTEIVA_CI_RUNNER=self-hosted`. No Windows, na conta do usuário normal, executar o runner preparado pelo Codex:
-   ```cmd
-   node "C:\Users\ewert\OneDrive\Documentos\ChatGPT\Roteiva\private-github-migration\scripts\runner\run-windows-vm.cjs" product --watch
-   ```
-   Conferir runner online com labels linux/x64/roteiva-ci e inicialização ao logon. Validar os jobs da origem com o runner real; se offline, não considerar checks aprovados.
-6. Confirmar o acesso do ChatGPT ao repositório agora privado com leitura, PR e Actions. Verificar o controlador com source-read, efetuar um novo pacote DEV e exercício completo de deploy. Testar Firestore data ops em DEV com operação sem dados de clientes.
-7. Não remover tokens, chaves ou backups de contingência até a verificação do fluxo novo. Renovar SOURCE_READ_TOKEN antes de expirar (o prazo depende do token criado pelo proprietário).
+1. Manter `roteiva-web` PRIVATE, `roteiva-deploy` PUBLIC e `ROTEIVA_CI_RUNNER=self-hosted`. Runners aparecem no GitHub quando há trabalho admissível na fila e encerram após um job.
+2. Para diagnóstico de capacidade e operação do pool, consulte a documentação de desenvolvimento da origem privada. Os perfis de CI e empacotamento usam labels distintos. Com o PC indisponível os checks permanecem pendentes.
+3. Conferir os gates do SHA final, o pacote imutável e o receipt DEV. Para PROD, usar o SHA aprovado e as duas aprovações protegidas. Durante recuperação, manter a origem privada e restaurar a última versão compatível nos provedores.
+4. Confirmar periodicamente o acesso pelos conectores e renovar o token de leitura antes da expiração. Armazenar valores de runtime e material de recuperação no cofre autorizado.

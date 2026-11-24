@@ -7,7 +7,7 @@ import {verifyPrSource} from './verify-pr-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe','ee8c582f39c1bd4aeadbe86a663f7b862f968c3a','e885f7adfe9c4e231dd7501ef5923d1b6ee0b17e','50ae1a673344ddd40cfdb2c354c1af6963750ac2','e08837491bb17e05a38dd4cabc30a6eebcd2a203','fc88079ad4c8396fb2bc27caa8992d04d68deafc']);
+const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe','ee8c582f39c1bd4aeadbe86a663f7b862f968c3a','e885f7adfe9c4e231dd7501ef5923d1b6ee0b17e','50ae1a673344ddd40cfdb2c354c1af6963750ac2','e08837491bb17e05a38dd4cabc30a6eebcd2a203','fc88079ad4c8396fb2bc27caa8992d04d68deafc','51402772a05415481ae162533c716973fbcadda9']);
 
 export async function verifyRelease({api,requestedSha,packageRunId,target,prNumber=''}){
  if(!['dev','prod'].includes(target))throw Error('Invalid release target');
