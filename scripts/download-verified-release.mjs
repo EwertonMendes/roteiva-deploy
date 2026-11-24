@@ -17,7 +17,7 @@ const api=async path=>{
  if(!response.ok)throw Error('Release metadata request failed (HTTP '+response.status+')');
  return response.json();
 };
-const verified=await verifyRelease({api,requestedSha:sha,target,packageRunId});
+const verified=await verifyRelease({api,requestedSha:sha,target,packageRunId,prNumber:process.env.PR_NUMBER||''});
 const tmp=process.env.RUNNER_TEMP;
 assert.ok(tmp&&resolve(tmp)!==process.cwd(),'Runner temporary directory required');
 const outer=join(tmp,'roteiva-controlled-release');
