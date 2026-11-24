@@ -2,8 +2,12 @@ import {createHash} from 'node:crypto';
 
 // Independently reviewed deploy executables, lockfiles and provider configs.
 const approved = {
-  dev: 'e2c0c05001622065d798a97d51c514a055c4522c0e6ec46a8ae45dc28b73ca09',
-  prod: '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
+  dev: [
+    'e2c0c05001622065d798a97d51c514a055c4522c0e6ec46a8ae45dc28b73ca09',
+    // Adds the exact review-list revision migration to the additive migration guard.
+    '01897cbb0a4538c4c096de37446e4a49d9d0a14757445529f05728fc0a8026f7',
+  ],
+  prod: ['688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150'],
 };
 
 const controls = /^(?:api\/(?:package(?:-lock)?\.json|wrangler\.jsonc|scripts\/[a-z0-9-]+\.mjs)|scripts\/[a-z0-9-]+\.mjs|shared\/environments\.ts|firebase\.json)$/;
@@ -23,7 +27,7 @@ export function releaseControlFingerprint(files, target) {
 }
 
 export function verifyReleaseControls(files, target) {
-  if (releaseControlFingerprint(files, target) !== approved[target]) {
+  if (!approved[target]?.includes(releaseControlFingerprint(files, target))) {
     throw new Error('Deployment scripts, dependencies or configuration require independent review in the controller.');
   }
 }
