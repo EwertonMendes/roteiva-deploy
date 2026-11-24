@@ -1,17 +1,19 @@
 import {appendFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {verifySource} from './verify-source.mjs';
+import {verifyPrSource} from './verify-pr-source.mjs';
 
 // Immutable source workflow reviewed in PR #224.
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe','ee8c582f39c1bd4aeadbe86a663f7b862f968c3a','e885f7adfe9c4e231dd7501ef5923d1b6ee0b17e']);
+const WORKFLOW_BLOBS=new Set(['248f7a0c870d4551ceedc244b8f50a3bceee13fe','ee8c582f39c1bd4aeadbe86a663f7b862f968c3a','e885f7adfe9c4e231dd7501ef5923d1b6ee0b17e','50ae1a673344ddd40cfdb2c354c1af6963750ac2']);
 
-export async function verifyRelease({api,requestedSha,packageRunId,target}){
+export async function verifyRelease({api,requestedSha,packageRunId,target,prNumber=''}){
  if(!['dev','prod'].includes(target))throw Error('Invalid release target');
  if(!/^[1-9][0-9]{5,14}$/.test(String(packageRunId)))throw Error('Release run ID is required');
- const gate=await verifySource({api,requestedSha,publicProbe:false});
+ if(prNumber&&target!=='dev')throw Error('PR releases are DEV-only');
+ const gate=prNumber?await verifyPrSource({api,requestedSha,prNumber}):await verifySource({api,requestedSha,publicProbe:false});
  const wf=await api('/actions/workflows/'+WORKFLOW_ID);
  if(wf.id!==WORKFLOW_ID||wf.path!==WORKFLOW_PATH||wf.state!=='active')
   throw Error('The reviewed packaging workflow is unavailable');
@@ -21,8 +23,8 @@ export async function verifyRelease({api,requestedSha,packageRunId,target}){
  // immutable SHA, target and owner through run metadata, job and artifact name.
  const run=await api('/actions/runs/'+packageRunId);
  if(run.id!==Number(packageRunId)||run.workflow_id!==WORKFLOW_ID||
-    run.head_sha!==requestedSha||run.head_branch!=='master'||
-    !(run.event==='workflow_dispatch'||(target==='dev'&&run.event==='workflow_run'))||
+    run.head_sha!==requestedSha||run.head_branch!==(prNumber?gate.branch:'master')||
+    !(run.event==='workflow_dispatch'||(!prNumber&&target==='dev'&&run.event==='workflow_run'))||
     run.conclusion!=='success'||run.status!=='completed'||
     run.repository?.id!==SOURCE_ID||run.head_repository?.id!==SOURCE_ID||
     run.actor?.id!==OWNER_ID)
@@ -38,8 +40,13 @@ export async function verifyRelease({api,requestedSha,packageRunId,target}){
     !/^sha256:[a-f0-9]{64}$/.test(matching[0].digest||'')||
     matching[0].size_in_bytes<=1000||matching[0].size_in_bytes>200_000_000)
   throw Error('Expected private, immutable, SHA-verified artifact unavailable');
- const latest=await api('/branches/master');
- if(latest.commit?.sha!==requestedSha)throw Error('Source master changed during release authorization');
+ if(prNumber){
+  const latest=await api('/pulls/'+prNumber);
+  if(latest.state!=='open'||latest.head?.sha!==requestedSha||latest.head?.repo?.id!==SOURCE_ID||latest.base?.ref!=='master')throw Error('PR changed during release authorization');
+ }else{
+  const latest=await api('/branches/master');
+  if(latest.commit?.sha!==requestedSha)throw Error('Source master changed during release authorization');
+ }
  return {...gate,target,packageRunId:Number(packageRunId),artifactId:matching[0].id,zipDigest:matching[0].digest};
 }
 async function main(){
@@ -53,7 +60,7 @@ async function main(){
   return response.json();
  };
  const info=await verifyRelease({api,requestedSha:process.env.RELEASE_SHA,
-  packageRunId:process.env.PACKAGE_RUN_ID,target:process.env.RELEASE_TARGET});
+  packageRunId:process.env.PACKAGE_RUN_ID,target:process.env.RELEASE_TARGET,prNumber:process.env.PR_NUMBER||''});
  if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,
   ['sha='+info.sha,'gate_run='+info.gateRun,'package_run='+info.packageRunId,
    'artifact_id='+info.artifactId,'zip_digest='+info.zipDigest].join('\n')+'\n');
