@@ -14,9 +14,21 @@ on:
         type: choice
         required: true
         default: verify
-        options: [verify, release, auto-dev]
+        options: [verify, release, auto-dev, preview, site]
+      pr_number:
+        description: Optional same-repository PR number (DEV only)
+        required: false
+        type: string
+      worker_only:
+        description: Publish Worker and D1 only (DEV only)
+        type: boolean
+        default: false
+      firestore_only:
+        description: Publish Firestore rules and indexes only (DEV only)
+        type: boolean
+        default: false
       sha:
-        description: Full source master SHA (release only)
+        description: Full source SHA (release only)
         type: string
       package_run_id:
         description: Source packaging workflow run ID (release only)
@@ -91,7 +103,7 @@ jobs:
     if: >-
       github.repository_id == '1469367994' && github.ref == 'refs/heads/master' &&
       github.actor_id == '33728924' &&
-      (github.event_name == 'schedule' || inputs.operation == 'release' || (inputs.operation == 'auto-dev' && inputs.target == 'development'))
+      (github.event_name == 'schedule' || inputs.operation == 'release' || inputs.operation == 'site' || inputs.operation == 'preview' || (inputs.operation == 'auto-dev' && inputs.target == 'development'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: source-read
@@ -105,6 +117,19 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
+      - name: Reject incompatible automatic release flags
+        if: github.event_name == 'schedule' || inputs.operation == 'auto-dev'
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          WORKER_ONLY: ${{ inputs.worker_only }}
+          FIRESTORE_ONLY: ${{ inputs.firestore_only }}
+          DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
+          BILLING_SCHEMA: ${{ inputs.billing_schema }}
+        run: |
+          set -euo pipefail
+          test -z "$PR_NUMBER"
+          for flag in "$FRONTEND_ONLY" "$WORKER_ONLY" "$FIRESTORE_ONLY" "$DOMAIN_CUTOVER" "$BILLING_SCHEMA"; do test "$flag" != true; done
       - name: Discover completed current DEV package (no dispatch credential)
         id: selection
         if: github.event_name == 'schedule' || inputs.operation == 'auto-dev'
@@ -113,10 +138,14 @@ jobs:
           MANUAL_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: node scripts/select-dev-release.mjs
       - name: Guard target and manually approved options
-        if: inputs.operation == 'release'
+        if: inputs.operation == 'release' || inputs.operation == 'preview' || inputs.operation == 'site'
         env:
           RELEASE_SHA: ${{ inputs.sha }}
           TARGET: ${{ inputs.target }}
+          OPERATION: ${{ inputs.operation }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          WORKER_ONLY: ${{ inputs.worker_only }}
+          FIRESTORE_ONLY: ${{ inputs.firestore_only }}
           CONFIRMATION: ${{ inputs.confirmation }}
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
           DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
@@ -124,22 +153,50 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
-          if [ "$TARGET" = production ]; then test "$CONFIRMATION" = 'DEPLOY ROTEIVA PROD'; fi
-          if [ "$FRONTEND_ONLY" = true ]; then
+          partial=0
+          for flag in "$FRONTEND_ONLY" "$WORKER_ONLY" "$FIRESTORE_ONLY"; do
+            if [ "$flag" = true ]; then partial=$((partial+1)); fi
+          done
+          test "$partial" -le 1
+          if [ "$TARGET" = production ]; then
+            test -z "$PR_NUMBER"
+            test "$WORKER_ONLY" != true
+            test "$FIRESTORE_ONLY" != true
+            if [ "$OPERATION" = site ]; then
+              test "$CONFIRMATION" = 'DEPLOY ROTEIVA SITE'
+              test "$partial" -eq 0
+              test "$DOMAIN_CUTOVER" != true
+              test "$BILLING_SCHEMA" != true
+            else
+              test "$OPERATION" = release
+              test "$CONFIRMATION" = 'DEPLOY ROTEIVA PROD'
+            fi
+          else
+            test "$TARGET" = development
+            test "$OPERATION" != site
             test "$DOMAIN_CUTOVER" != true
             test "$BILLING_SCHEMA" != true
+            if [ -n "$PR_NUMBER" ]; then
+              [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]
+              test "$CONFIRMATION" = 'PUBLICAR_PR_DEV'
+            fi
+            if [ "$OPERATION" = preview ]; then
+              test -n "$PR_NUMBER"
+              test "$partial" -eq 0
+            fi
           fi
-          if [ "$TARGET" = development ]; then
+          if [ "$FRONTEND_ONLY" = true ]; then
             test "$DOMAIN_CUTOVER" != true
             test "$BILLING_SCHEMA" != true
           fi
       - name: Verify the private source, merged PR, release checks and exact artifact
         id: manual
-        if: inputs.operation == 'release'
+        if: inputs.operation == 'release' || inputs.operation == 'preview' || inputs.operation == 'site'
         env:
           SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
           RELEASE_SHA: ${{ inputs.sha }}
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          PR_NUMBER: ${{ inputs.pr_number }}
           RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
         run: |
           node scripts/verify-release-package.mjs
@@ -148,7 +205,9 @@ jobs:
   worker:
     name: Publish Cloudflare Worker and D1 (protected)
     needs: preflight
-    if: needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' && !inputs.frontend_only
+    if: >-
+      needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' &&
+      !inputs.frontend_only && !inputs.firestore_only && inputs.operation != 'site' && inputs.operation != 'preview'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-${{ inputs.target || 'development' }}
@@ -162,6 +221,7 @@ jobs:
       API_BASE_URL: ${{ vars.API_BASE_URL }}
       RELEASE_SHA: ${{ needs.preflight.outputs.sha }}
       PACKAGE_RUN_ID: ${{ needs.preflight.outputs.package_run }}
+      PR_NUMBER: ${{ inputs.pr_number }}
       RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       WRANGLER_SEND_METRICS: 'false'
@@ -227,8 +287,8 @@ jobs:
     name: Publish Firebase Hosting and Firestore (protected OIDC)
     needs: [preflight, worker]
     if: >-
-      !cancelled() && needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' &&
-      (needs.worker.result == 'success' || (inputs.frontend_only && needs.worker.result == 'skipped'))
+      !cancelled() && !inputs.worker_only && needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' &&
+      (needs.worker.result == 'success' || ((inputs.frontend_only || inputs.firestore_only || inputs.operation == 'site' || inputs.operation == 'preview') && needs.worker.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: firebase-${{ inputs.target || 'development' }}
@@ -239,6 +299,7 @@ jobs:
       SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
       RELEASE_SHA: ${{ needs.preflight.outputs.sha }}
       PACKAGE_RUN_ID: ${{ needs.preflight.outputs.package_run }}
+      PR_NUMBER: ${{ inputs.pr_number }}
       RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
@@ -281,14 +342,33 @@ jobs:
         run: node scripts/verify-firebase-identity.mjs
       - name: Install pinned Firebase CLI
         run: npm install --global --ignore-scripts --no-audit --no-fund firebase-tools@15.34.0
+      - name: Require compatible access Worker before a DEV Hosting-only release
+        if: inputs.frontend_only && inputs.target == 'development'
+        working-directory: ${{ steps.bundle.outputs.release_path }}
+        run: node scripts/check-access-worker.mjs
       - name: Deploy Hosting and optionally reviewed Firestore rules/indexes
         working-directory: ${{ steps.bundle.outputs.release_path }}
         env:
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          FIRESTORE_ONLY: ${{ inputs.firestore_only }}
+          OPERATION: ${{ inputs.operation }}
         run: |
           set -euo pipefail
-          if [ "$FRONTEND_ONLY" = true ] || [ "$DOMAIN_CUTOVER" = true ]; then
+          if [ "$OPERATION" = site ]; then
+            test "$RELEASE_TARGET" = prod
+            firebase deploy --config firebase.site.prod.json --only hosting:roteiva-site-prod --project "$FIREBASE_PROJECT_ID" --non-interactive
+            exit 0
+          fi
+          if [ "$OPERATION" = preview ]; then
+            test "$RELEASE_TARGET" = dev
+            [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]
+            firebase hosting:channel:deploy "pr-$PR_NUMBER" --config firebase.json --project "$FIREBASE_PROJECT_ID" --expires 7d --non-interactive
+            exit 0
+          fi
+          if [ "$FIRESTORE_ONLY" = true ]; then
+            only='firestore:rules,firestore:indexes'
+          elif [ "$FRONTEND_ONLY" = true ] || [ "$DOMAIN_CUTOVER" = true ]; then
             if [ "$RELEASE_TARGET" = dev ]; then only="hosting"; else only="hosting:roteiva-web-prod"; fi
           elif [ "$RELEASE_TARGET" = prod ]; then
             only="firestore:rules,firestore:indexes,hosting:roteiva-web-prod"
@@ -300,8 +380,15 @@ jobs:
         working-directory: ${{ steps.bundle.outputs.release_path }}
         env:
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          FIRESTORE_ONLY: ${{ inputs.firestore_only }}
+          OPERATION: ${{ inputs.operation }}
         run: |
           set -euo pipefail
+          if [ "$OPERATION" = site ]; then
+            node scripts/verify-institutional-hosting.mjs https://roteiva-site-prod.web.app
+            exit 0
+          fi
+          if [ "$OPERATION" = preview ] || [ "$FIRESTORE_ONLY" = true ]; then exit 0; fi
           if [ "$RELEASE_TARGET" = prod ]; then
             node scripts/verify-hosting-cache.mjs https://app.roteiva.com
             node scripts/verify-domain-app.mjs
