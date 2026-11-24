@@ -25,6 +25,7 @@ PRs de origem #227 e #228 e de controlador #7, #8 e #9 integrados. A origem em m
 - `roteiva-deploy`: política de release, aprovação e publicação temporária em GitHub-hosted runners. Nenhum pacote de origem é armazenado como artefato do controlador público. Metadados de release (SHA e IDs) são públicos.
 - Após um push na master privada com gates verdes, o workflow source-only gera o pacote DEV. O controlador verifica periodicamente o pacote **concluído**. Não há PAT de escrita entre os repositórios. O receipt impede repetir o mesmo SHA ou desfazer uma promoção manual de PR. O proprietário pode reexecutar manualmente um release após falha.
 - PROD continua exigindo o SHA atual, gates, pacote verificável e as aprovações cloudflare-production e firebase-production.
+- A extração confere o digest do pacote e a revisão exata dos scripts de publicação, lockfiles e configurações que serão usados com credenciais. Alterações nesses arquivos exigem revisão própria no controlador. Worker compilado, conteúdo estático e migrações seguem suas verificações de release e ambiente.
 - Os jobs legados da origem que dependem dos environments de publicação são guardados contra execução privada. Não remover suas validações de PR.
 
 ## Operação dos fluxos
@@ -51,7 +52,7 @@ Os conectores não podem alterar visibilidade do repositório, registrar runner 
 
 - `firebase-ops.yml` na origem: privado somente, GitHub-hosted, owner/manual/master; OIDC separado de deploy, projeto DEV, `FIREBASE_DATA_WIF_PROVIDER`, `FIREBASE_DATA_SERVICE_ACCOUNT`, `FIREBASE_DATA_OPS_ENABLED=true`. Conta `roteiva-private-dev-ops@roteiva-web-dev.iam.gserviceaccount.com`, papel Datastore User. Provedor restrito a ID da origem, ID do proprietário/ator, workflow ref, evento manual, runner github-hosted e visibilidade private. Não usar a identidade de Hosting.
 - `prod-qa-access.yml` no controlador: source package verificado, ambiente cloudflare-production protegido, apenas conta de QA já autorizada por hash. `GCP_QA_WIF_PROVIDER`, `GCP_QA_SERVICE_ACCOUNT` (conta `roteiva-private-prod-qa@roteiva-web-prod.iam.gserviceaccount.com`), `QA_PROD_TARGET_EMAIL` (secret, nunca input público). OIDC dedicado e restrito ao ID do controlador, workflow ref exato, owner/manual/master, runner GitHub-hosted e environment cloudflare-production. Usar primeiro `action=check`, nunca expirar/restaurar só para ensaio.
-- As duas identidades usam tokens curtos e não substituem as chaves de runtime do Roteiva. A autorização IAM e o secret precisam ser criados pelo proprietário em seu PC; a configuração ainda não foi executada/validada de ponta a ponta.
+- As duas identidades usam tokens curtos. A checagem protegida de QA PROD e a contagem de uma coleção sintética em DEV passaram com as identidades dedicadas. As chaves de runtime continuam sob custódia do provedor.
 
 ### Operação após a virada
 

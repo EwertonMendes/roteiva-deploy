@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {mkdirSync,readdirSync,readFileSync,rmSync,lstatSync,statSync,writeFileSync} from 'node:fs';
 import {join,normalize,relative,resolve,sep} from 'node:path';
 import {verifyRelease} from './verify-release-package.mjs';
+import {verifyReleaseControls} from './verify-release-controls.mjs';
 
 const SOURCE='EwertonMendes/roteiva-web';
 const sha=process.env.RELEASE_SHA,target=process.env.RELEASE_TARGET;
@@ -62,7 +63,7 @@ function walk(path){
   const absolute=join(path,item.name),st=lstatSync(absolute);
   assert.ok(st.isDirectory()||st.isFile(),'Links are not permitted in release payload');
   if(st.isDirectory())walk(absolute);
-  else if(item.name!=='release-manifest.json')
+  else if(absolute!==join(extract,'release-manifest.json'))
    observed.push({path:relative(extract,absolute).split(sep).join('/'),
     size:st.size,sha256:createHash('sha256').update(readFileSync(absolute)).digest('hex')});
  }
@@ -70,6 +71,7 @@ function walk(path){
 walk(extract);
 observed.sort((a,b)=>a.path.localeCompare(b.path));
 assert.deepEqual(observed,manifest.files,'Package file digest, size or listing mismatch');
+verifyReleaseControls(observed,target);
 const identity=JSON.parse(readFileSync(join(extract,'dist/roteiva-build.json'),'utf8'));
 assert.equal(identity.sha,sha);
 assert.equal(identity.projectId,'roteiva-web-'+target);
