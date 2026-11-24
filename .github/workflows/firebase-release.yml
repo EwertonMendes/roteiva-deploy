@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/firebase-release.yml'
       - 'scripts/**'
+  schedule:
+    - cron: '17,47 * * * *'
   workflow_dispatch:
     inputs:
       operation:
@@ -12,7 +14,7 @@ on:
         type: choice
         required: true
         default: verify
-        options: [verify, release]
+        options: [verify, release, auto-dev]
       sha:
         description: Full source master SHA (release only)
         type: string
@@ -38,7 +40,7 @@ on:
         options: [development, production]
 permissions: {}
 concurrency:
-  group: firebase-release-identity-${{ inputs.target }}
+  group: firebase-release-identity-${{ inputs.target || 'development' }}
   cancel-in-progress: false
 jobs:
   test:
@@ -54,7 +56,7 @@ jobs:
   verify:
     if: >-
       github.repository_id == '1469367994' && github.ref == 'refs/heads/master' &&
-      github.actor_id == '33728924' && inputs.operation != 'release' && contains(fromJSON('["development","production"]'), inputs.target)
+      github.actor_id == '33728924' && github.event_name == 'workflow_dispatch' && inputs.operation == 'verify' && contains(fromJSON('["development","production"]'), inputs.target)
     runs-on: ubuntu-latest
     environment: firebase-${{ inputs.target }}
     timeout-minutes: 5
@@ -88,17 +90,30 @@ jobs:
     name: Verify immutable master SHA, CI and artifact provenance
     if: >-
       github.repository_id == '1469367994' && github.ref == 'refs/heads/master' &&
-      github.actor_id == '33728924' && inputs.operation == 'release'
+      github.actor_id == '33728924' &&
+      (github.event_name == 'schedule' || inputs.operation == 'release' || (inputs.operation == 'auto-dev' && inputs.target == 'development'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: source-read
+    outputs:
+      ready: ${{ steps.selection.outputs.ready || steps.manual.outputs.ready }}
+      sha: ${{ steps.selection.outputs.sha || steps.manual.outputs.sha }}
+      package_run: ${{ steps.selection.outputs.package_run || steps.manual.outputs.package_run }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
+      - name: Discover completed current DEV package (no dispatch credential)
+        id: selection
+        if: github.event_name == 'schedule' || inputs.operation == 'auto-dev'
+        env:
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+          MANUAL_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: node scripts/select-dev-release.mjs
       - name: Guard target and manually approved options
+        if: inputs.operation == 'release'
         env:
           RELEASE_SHA: ${{ inputs.sha }}
           TARGET: ${{ inputs.target }}
@@ -119,20 +134,24 @@ jobs:
             test "$BILLING_SCHEMA" != true
           fi
       - name: Verify the private source, merged PR, release checks and exact artifact
+        id: manual
+        if: inputs.operation == 'release'
         env:
           SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
           RELEASE_SHA: ${{ inputs.sha }}
           PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
           RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
-        run: node scripts/verify-release-package.mjs
+        run: |
+          node scripts/verify-release-package.mjs
+          echo ready=true >> "$GITHUB_OUTPUT"
 
   worker:
     name: Publish Cloudflare Worker and D1 (protected)
     needs: preflight
-    if: needs.preflight.result == 'success' && !inputs.frontend_only
+    if: needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' && !inputs.frontend_only
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: cloudflare-${{ inputs.target }}
+    environment: cloudflare-${{ inputs.target || 'development' }}
     permissions:
       contents: read
     env:
@@ -141,8 +160,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
       API_BASE_URL: ${{ vars.API_BASE_URL }}
-      RELEASE_SHA: ${{ inputs.sha }}
-      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      RELEASE_SHA: ${{ needs.preflight.outputs.sha }}
+      PACKAGE_RUN_ID: ${{ needs.preflight.outputs.package_run }}
       RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       WRANGLER_SEND_METRICS: 'false'
@@ -208,18 +227,18 @@ jobs:
     name: Publish Firebase Hosting and Firestore (protected OIDC)
     needs: [preflight, worker]
     if: >-
-      !cancelled() && needs.preflight.result == 'success' &&
+      !cancelled() && needs.preflight.result == 'success' && needs.preflight.outputs.ready == 'true' &&
       (needs.worker.result == 'success' || (inputs.frontend_only && needs.worker.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: firebase-${{ inputs.target }}
+    environment: firebase-${{ inputs.target || 'development' }}
     permissions:
       contents: read
       id-token: write
     env:
       SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
-      RELEASE_SHA: ${{ inputs.sha }}
-      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      RELEASE_SHA: ${{ needs.preflight.outputs.sha }}
+      PACKAGE_RUN_ID: ${{ needs.preflight.outputs.package_run }}
       RELEASE_TARGET: ${{ inputs.target == 'production' && 'prod' || 'dev' }}
       DOMAIN_CUTOVER: ${{ inputs.domain_cutover }}
       PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
@@ -257,7 +276,7 @@ jobs:
       - name: Verify OIDC trust and Firebase environment boundaries
         env:
           ACCESS_TOKEN: ${{ steps.identity.outputs.access_token }}
-          TARGET: ${{ inputs.target }}
+          TARGET: ${{ inputs.target || 'development' }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
         run: node scripts/verify-firebase-identity.mjs
       - name: Install pinned Firebase CLI
