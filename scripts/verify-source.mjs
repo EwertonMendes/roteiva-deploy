@@ -9,8 +9,15 @@ const WORKFLOW_ID = 428_216_408;
 const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
 const WORKFLOW_BLOBS = new Set([
   'e251344637b6edecac7469244d745272a9a68dd9',
-  '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d','02af8c7ee7e52db79c1c1ac88972f8e40f77e591','d3cc0aa27f3a97d408912c270db5630a7539197c',
+  '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d',
+  '02af8c7ee7e52db79c1c1ac88972f8e40f77e591',
+  'd3cc0aa27f3a97d408912c270db5630a7539197c',
+  '3df528eb74197bc8f9715d4069956c2761223bf5',
 ]);
+
+export function isReviewedGateWorkflow(sha) {
+  return WORKFLOW_BLOBS.has(sha);
+}
 const REQUIRED_JOBS = [
   '01 - Quality, security & production build',
   '02 - E2E Access, billing & tenant isolation',
@@ -49,7 +56,7 @@ export async function verifySource({ api, requestedSha, publicProbe }) {
   requireThat(workflow.id === WORKFLOW_ID && workflow.path === WORKFLOW_PATH && workflow.state === 'active',
     'The approved release workflow is unavailable.');
   const revision = await api('/contents/' + WORKFLOW_PATH + '?ref=' + requestedSha);
-  requireThat(WORKFLOW_BLOBS.has(revision.sha), 'The release workflow implementation requires controller review.');
+  requireThat(isReviewedGateWorkflow(revision.sha), 'The release workflow implementation requires controller review.');
 
   const filters = new URLSearchParams({ branch: BRANCH, event: 'push', head_sha: requestedSha, per_page: '10' });
   const runs = await api('/actions/workflows/' + WORKFLOW_ID + '/runs?' + filters);
