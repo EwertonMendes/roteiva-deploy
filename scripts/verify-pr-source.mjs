@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
+import {isReviewedGateWorkflow} from './verify-source.mjs';
 const SOURCE='EwertonMendes/roteiva-web',ID=1422595328,OWNER=33728924,GATE=428216408;
-const GATE_BLOBS=new Set(['e251344637b6edecac7469244d745272a9a68dd9','9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d','02af8c7ee7e52db79c1c1ac88972f8e40f77e591','d3cc0aa27f3a97d408912c270db5630a7539197c']);
 const JOBS=['01 - Quality, security & production build','02 - E2E Access, billing & tenant isolation','03 - E2E Projects, finance, Drive & approvals'];
 export async function verifyPrSource({api,requestedSha,prNumber}){
  assert.match(requestedSha||'',/^[a-f0-9]{40}$/);
@@ -17,7 +17,7 @@ export async function verifyPrSource({api,requestedSha,prNumber}){
  const wf=await api('/actions/workflows/'+GATE);
  assert.ok(wf.id===GATE&&wf.path==='.github/workflows/qa-production-gates.yml'&&wf.state==='active','Unexpected quality workflow');
  const revision=await api('/contents/.github/workflows/qa-production-gates.yml?ref='+requestedSha);
- assert.ok(GATE_BLOBS.has(revision.sha),'PR quality workflow needs controller review');
+ assert.ok(isReviewedGateWorkflow(revision.sha),'PR quality workflow needs controller review');
  const params=new URLSearchParams({branch:pr.head.ref,head_sha:requestedSha,per_page:'30'});
  const list=await api('/actions/workflows/'+GATE+'/runs?'+params);
  const run=list.workflow_runs?.find(r=>r.workflow_id===GATE&&r.head_sha===requestedSha&&r.head_branch===pr.head.ref&&
