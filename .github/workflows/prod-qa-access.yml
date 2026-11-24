@@ -13,10 +13,10 @@ on:
       action:
         description: Fixed QA account operation (identity from protected secret)
         type: choice
-        options: [check, expire, restore]
+        options: [verify-permissions, check, expire, restore]
         required: true
       confirmation:
-        description: Type EXPIRE ROTEIVA PROD TEST
+        description: Type VERIFY ROTEIVA PROD QA for permission probe, or EXPIRE ROTEIVA PROD TEST for trial operations
         required: true
         type: string
 permissions: {}
@@ -47,8 +47,11 @@ jobs:
           SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
         run: |
           set -euo pipefail
-          test "$CONFIRMATION" = 'EXPIRE ROTEIVA PROD TEST'
-          case "$ACTION" in check|expire|restore) ;; *) exit 1;; esac
+          case "$ACTION" in
+            verify-permissions) test "$CONFIRMATION" = 'VERIFY ROTEIVA PROD QA' ;;
+            check|expire|restore) test "$CONFIRMATION" = 'EXPIRE ROTEIVA PROD TEST' ;;
+            *) exit 1 ;;
+          esac
           node scripts/verify-release-package.mjs
   qa:
     needs: authorize
