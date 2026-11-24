@@ -1,45 +1,68 @@
-# Roteiva — estado da migração GitHub privado (23/11/2026)
+# Roteiva — migração para repositório privado
 
-> **NÃO alterar a visibilidade do repositório principal ainda.** A publicação real pelo controlador ainda não passou em DEV.
+## Estado verificado em 24/11/2026 UTC
 
-## Evidência já confirmada
+**Não declarar a migração concluída antes da virada e dos testes do runner real no repositório privado.** A origem ainda está pública. Os serviços DEV e PROD continuam operacionais.
 
-- `roteiva-web` segue público e a CI da master concluiu para `60e294ce5be7b71152dc0f17535921a166cb7a10`.
-- O ensaio completo do empacotamento DEV ficou no run `45287937010` do repositório de origem, artefato `roteiva-release-dev-60e294ce5be7b71152dc0f17535921a166cb7a10` com digest SHA-256, armazenado **somente no repositório de origem**.
-- O controlador aprovou o SHA, o PR de origem, o workflow conhecido e seus jobs de CI.
-- O workflow `Verify release source` conseguiu baixar, extrair e conferir os arquivos do artefato em modo somente leitura: https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45288572327
-- O workflow existente `firebase-release.yml` manteve sua identidade OIDC e validou permissões DEV: https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45288191906
-- O GitHub integrado ao ChatGPT comprovou leitura, branch, commit, PR e disparo de Action no repositório privado descartável `roteiva-private-connector-check`: PR #2.
-- O piloto Linux do runner isolado passou em execuções anteriores.
-- O teste de publicação DEV pela nova esteira iniciou e fez preflight com sucesso, mas parou **antes de qualquer alteração no Cloudflare** por falta de `SOURCE_READ_TOKEN` no environment `cloudflare-development`: https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45288305089
+### Evidências
 
-## Pendências de configuração do GitHub (executar no PC com Codex/gh; nunca enviar segredos no chat)
+| Verificação | Execução |
+|---|---|
+| Conector ChatGPT em repositório privado (leitura, branch, commit, PR e Actions) | roteiva-private-connector-check PR #2 / run 45285192771 |
+| DEV pelo controlador (Worker/D1, Firebase/Firestore, OIDC) | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45290845053 |
+| PROD pelo controlador, incluindo as duas aprovações | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45298002721 |
+| Descoberta automática de pacote concluído DEV, ensaio manual real | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45299894444 |
+| Preview real de PR, sem publicação do Worker | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45301108333 |
+| Checks do controlador (modos especiais e QA) | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45300590115 |
+| Checks de origem do PR #228 | https://github.com/EwertonMendes/roteiva-web/actions/runs/45300560552 |
+| Controle de duplicidade DEV | https://github.com/EwertonMendes/roteiva-deploy/actions/runs/45301356398 |
 
-1. Reaproveitar o token de leitura fine-grained do repositório `roteiva-web`, já validado em `source-read`. Se o valor original não estiver disponível com segurança, **gerar um novo** e revogar o anterior somente depois da validação. Não é possível ler secrets gravados no GitHub.
-2. Configurar o secret **SOURCE_READ_TOKEN** nos quatro environments do controlador: `cloudflare-development`, `firebase-development`, `cloudflare-production`, `firebase-production`. Usar `gh secret set SOURCE_READ_TOKEN --env <nome> --repo EwertonMendes/roteiva-deploy` com entrada secreta via mecanismo seguro, sem `echo`, log ou commit do token. Conferir o escopo **Contents e Actions (read)** e expiração. O environment `source-read` já foi testado.
-3. Na origem, conferir as variáveis de repositório `FIREBASE_DEV_WEB_API_KEY`, `PROD_FIREBASE_WEB_API_KEY` e `PRODUCTION_BILLING_ENABLED`, `PRODUCTION_BILLING_CHECKOUT_ENABLED`, `PRODUCTION_BILLING_PIX_ENABLED`, `PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED`. As flags de PROD devem ser **exatamente iguais** às já usadas em `cloudflare-production` e `firebase-production`. Nunca adivinhar ou desativar cobrança para fazer build passar.
-4. Conferir que cada environment Cloudflare tem `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`, `API_BASE_URL`, todos com os recursos corretos. Conferir que cada environment Firebase tem os dados de WIF/OIDC e `FIREBASE_PROJECT_ID`. Valores secretos não devem sair do cofre.
-5. Registrar a renovação do token fonte antes de **23/12/2026**.
+PRs de origem #227 e #228 e de controlador #7, #8 e #9 integrados. A origem em master no momento deste registro: `88d5db44b26c253a42e4d09e9614fcbf9f2bc022`.
 
-## Procedimento seguro de homologação (bloqueia alteração de visibilidade até aprovação)
+### Arquitetura
 
-1. Aguardar sucesso dos três checks da master.
-2. Usar `Prepare immutable DEV/PROD release package` na **origem**, modo manual, `target=dev`, `sha=<SHA atual da master>`. Confirmar upload do pacote com nome e digest esperados. Se a origem estiver privada, o job usará o runner isolado quando `ROTEIVA_CI_RUNNER=self-hosted`.
-3. Executar `Verify release source` no **controlador**, com `public_probe=false`, `package_run_id=<run anterior>`, `target=dev`, `sha=<mesmo SHA>`. Exigir sucesso no download e SHA-256.
-4. Executar `Verify Firebase release identity` / `firebase-release.yml` no controlador, `operation=release`, `target=development`, `sha=<mesmo SHA>`, `package_run_id=<run da origem>`. A ordem exigida é **preflight → Cloudflare/D1 → Firebase**. Só seguir após todos os jobs aprovarem.
-5. Validar saúde Worker, migrações D1, regras Firestore, Firebase Hosting e login/CRUD básico de usuário de teste em DEV. Não realizar alterações em usuários reais ou pagamentos reais.
-6. Validar rollback de Worker/Hosting e procedimento de falha parcial. Não desfazer automaticamente migrações D1 já aplicadas.
-7. Ensaiar aprovação PROD com a proteção nativa; exigir que falha do Worker impeça o job Firebase. Depois realizar um deploy PROD **somente com autorização explícita do proprietário**, preferencialmente uma versão conhecida e sem mudança funcional.
-8. Só após DEV/PROD aprovados, transferir totalmente o gatilho automático de DEV, as promoções manuais de PR e os workflows especiais (site institucional, suporte, Firestore, QA operacional) para o controlador ou equivalente seguro. Auditar os scripts/ambientes antigos.
-9. Desativar os **jobs de deploy** antigos de `roteiva-web` **sem remover os jobs de teste**. Não deixá-los tentar usar environment secrets de um repositório privado no GitHub Free.
-10. Rever o backup do GitHub Pages legado e as regras de visibilidade; reautorizar conectores no ChatGPT/Codex. Somente então mudar `roteiva-web` para privado na interface GitHub e testar leitura, commits, PR, logs e Actions reais.
+- `roteiva-web`: código, CI, pacotes, artefatos e logs de compilação. O runner local será registrado somente depois da origem privada, sem credenciais de publicação de repositório.
+- `roteiva-deploy`: política de release, aprovação e publicação temporária em GitHub-hosted runners. Nenhum pacote de origem é armazenado como artefato do controlador público. Metadados de release (SHA e IDs) são públicos.
+- Após um push na master privada com gates verdes, o workflow source-only gera o pacote DEV. O controlador verifica periodicamente o pacote **concluído**. Não há PAT de escrita entre os repositórios. O receipt impede repetir o mesmo SHA ou desfazer uma promoção manual de PR. O proprietário pode reexecutar manualmente um release após falha.
+- PROD continua exigindo o SHA atual, gates, pacote verificável e as aprovações cloudflare-production e firebase-production.
+- Os jobs legados da origem que dependem dos environments de publicação são guardados contra execução privada. Não remover suas validações de PR.
 
-## Restrições importantes
+## Operação dos fluxos
 
-- O repositório público `roteiva-deploy` **não** armazena pacotes ou logs de build.
-- O controlador volta a validar a origem após a aprovação protegida.
-- Não usar um secret em saída de job ou artifact público para evitar configurar os environments.
-- O pacote de origem expira em dois dias: gerar outro se necessário; o release não deve aceitar um pacote velho ou SHA anterior.
-- O source runner local nunca recebe tokens de publicação em PROD.
-- Alterar privacidade exige ação administrativa na interface do GitHub; os conectores desta sessão não oferecem ação de visibilidade.
-- O caminho automático de DEV ainda não foi transferido. **Não marcar a migração como concluída nem mudar a visibilidade antes dessa transferência validada.**
+### DEV automático
+
+Após a virada, basta mergear o PR autorizado. O runner precisa estar online. Para promoção imediata após a criação do pacote, disparar `firebase-release.yml` no controlador com `operation=auto-dev`, `target=development` (apenas para master). O cron pode sofrer atrasos do GitHub.
+
+### Release manual / PR
+
+1. Na origem: `release-package.yml`, ref `master`, sha completo e target `dev` ou `prod`.
+2. Para PR aberto: ref = branch exata do PR, `target=dev`, `sha=PR head SHA`, `pr_number` = número. A revisão do workflow e os três gates do PR devem ser aprovados; atualizar o branch com master se necessário.
+3. No controlador: `firebase-release.yml`, operation `release`, target `development` ou `production`, sha e package_run_id. PRs só DEV, com `confirmation=PUBLICAR_PR_DEV` e pr_number. Em PROD: `confirmation=DEPLOY ROTEIVA PROD` e aprovar os environments. As opções `frontend_only`, `worker_only` (DEV) e `firestore_only` (DEV) são mutuamente exclusivas.
+4. Preview: `operation=preview`, target development, PR e confirmação acima. Publica canal temporário pr-N, não modifica Worker ou Hosting ao vivo.
+5. Site institucional: pacote prod de master, operation `site`, target production, `confirmation=DEPLOY ROTEIVA SITE`. Publica apenas o site institucional. O modo requer homologação real quando utilizado, com aprovação PROD.
+6. Redação dos logs: operation `observability`, target production, `confirmation=APLICAR REDACAO PROD`. Usa pacote prod e ambiente protegido; não republica Worker.
+7. QA infraestrutura DEV: operation `qa-infra`, target development, pacote dev de master. Executa verificações read-only de D1/Worker. QA público de navegador permanece na origem. QA autenticado com sessão de conta de teste **não deve mover dados/artefatos para o controlador público**; precisa de reaprovisionamento em execução privada isolada se utilizado. Os últimos três ensaios QA real DEV foram smoke, com job autenticado ignorado.
+
+## Bloqueios administrativos reais
+
+Os conectores não podem alterar visibilidade do repositório, registrar runner no Windows, configurar IAM Google ou recuperar valores de secrets. Não contornar isso exportando secrets por logs, commits ou artefatos.
+
+### Identidades dedicadas de dados
+
+- `firebase-ops.yml` na origem: privado somente, GitHub-hosted, owner/manual/master; OIDC separado de deploy, projeto DEV, `FIREBASE_DATA_WIF_PROVIDER`, `FIREBASE_DATA_SERVICE_ACCOUNT`, `FIREBASE_DATA_OPS_ENABLED=true`. Conta `roteiva-private-dev-ops@roteiva-web-dev.iam.gserviceaccount.com`, papel Datastore User. Provedor restrito a ID da origem, ID do proprietário/ator, workflow ref, evento manual, runner github-hosted e visibilidade private. Não usar a identidade de Hosting.
+- `prod-qa-access.yml` no controlador: source package verificado, ambiente cloudflare-production protegido, apenas conta de QA já autorizada por hash. `GCP_QA_WIF_PROVIDER`, `GCP_QA_SERVICE_ACCOUNT` (conta `roteiva-private-prod-qa@roteiva-web-prod.iam.gserviceaccount.com`), `QA_PROD_TARGET_EMAIL` (secret, nunca input público). OIDC dedicado e restrito ao ID do controlador, workflow ref exato, owner/manual/master, runner GitHub-hosted e environment cloudflare-production. Usar primeiro `action=check`, nunca expirar/restaurar só para ensaio.
+- As duas identidades usam tokens curtos e não substituem as chaves de runtime do Roteiva. A autorização IAM e o secret precisam ser criados pelo proprietário em seu PC; a configuração ainda não foi executada/validada de ponta a ponta.
+
+### Virada final (somente após validação)
+
+1. Conferir os checks finais, a publicação DEV pelo controlador e o PROD aprovado. Validar operação QA protegida read-only e preparar DEV data OIDC.
+2. Verificar backup local e destino do GitHub Pages histórico (o site/app atual usa Firebase e Cloudflare). Preservar os valores de runtime e configurações de billing/OAuth.
+3. Confirmar que a origem não tem secrets de repositório de publicação; remover apenas o `FIREBASE_SERVICE_ACCOUNT` legado de escopo de repositório após confirmação de backup e transferência. Não apagar indiscriminadamente secrets ou environments.
+4. Alterar visibilidade somente de `roteiva-web` para PRIVATE. Manter `roteiva-deploy` PUBLIC. Não reverter automaticamente para público em caso de problema.
+5. Confirmar `ROTEIVA_CI_RUNNER=self-hosted`. No Windows, na conta do usuário normal, executar o runner preparado pelo Codex:
+   ```cmd
+   node "C:\Users\ewert\OneDrive\Documentos\ChatGPT\Roteiva\private-github-migration\scripts\runner\run-windows-vm.cjs" product --watch
+   ```
+   Conferir runner online com labels linux/x64/roteiva-ci e inicialização ao logon. Validar os jobs da origem com o runner real; se offline, não considerar checks aprovados.
+6. Confirmar o acesso do ChatGPT ao repositório agora privado com leitura, PR e Actions. Verificar o controlador com source-read, efetuar um novo pacote DEV e exercício completo de deploy. Testar Firestore data ops em DEV com operação sem dados de clientes.
+7. Não remover tokens, chaves ou backups de contingência até a verificação do fluxo novo. Renovar SOURCE_READ_TOKEN antes de expirar (o prazo depende do token criado pelo proprietário).
