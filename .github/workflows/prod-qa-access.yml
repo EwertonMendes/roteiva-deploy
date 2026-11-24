@@ -1,0 +1,113 @@
+name: Protected PROD QA account maintenance
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Current approved master SHA
+        required: true
+        type: string
+      package_run_id:
+        description: Exact verified PROD package run
+        required: true
+        type: string
+      action:
+        description: Fixed QA account operation (identity from protected secret)
+        type: choice
+        options: [check, expire, restore]
+        required: true
+      confirmation:
+        description: Type EXPIRE ROTEIVA PROD TEST
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: firebase-release-identity-production
+  cancel-in-progress: false
+jobs:
+  authorize:
+    if: >-
+      github.repository_id == '1469367994' && github.ref == 'refs/heads/master' &&
+      github.actor_id == '33728924'
+    runs-on: ubuntu-latest
+    environment: source-read
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Require explicit fixed QA operation and approved PROD artifact
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          ACTION: ${{ inputs.action }}
+          RELEASE_SHA: ${{ inputs.sha }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          RELEASE_TARGET: prod
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = 'EXPIRE ROTEIVA PROD TEST'
+          case "$ACTION" in check|expire|restore) ;; *) exit 1;; esac
+          node scripts/verify-release-package.mjs
+  qa:
+    needs: authorize
+    runs-on: ubuntu-latest
+    environment: cloudflare-production
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_SHA: ${{ inputs.sha }}
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      RELEASE_TARGET: prod
+      PRODUCTION_BILLING_ENABLED: ${{ vars.PRODUCTION_BILLING_ENABLED }}
+      PRODUCTION_BILLING_CHECKOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_CHECKOUT_ENABLED }}
+      PRODUCTION_BILLING_PIX_ENABLED: ${{ vars.PRODUCTION_BILLING_PIX_ENABLED }}
+      PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED: ${{ vars.PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED }}
+      WRANGLER_SEND_METRICS: 'false'
+      WRANGLER_WRITE_LOGS: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revalidate artifact and extract only to temporary runner storage
+        id: bundle
+        env:
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+        run: node scripts/download-verified-release.mjs
+      - name: Require reviewed dedicated QA identity
+        env:
+          QA_IDENTITY: ${{ vars.GCP_QA_SERVICE_ACCOUNT }}
+          QA_PROVIDER: ${{ vars.GCP_QA_WIF_PROVIDER }}
+        run: |
+          test "$QA_IDENTITY" = 'roteiva-private-prod-qa@roteiva-web-prod.iam.gserviceaccount.com'
+          test -n "$QA_PROVIDER"
+      - name: Install pinned API tools without install scripts
+        working-directory: ${{ steps.bundle.outputs.release_path }}/api
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        id: identity
+        with:
+          workload_identity_provider: ${{ vars.GCP_QA_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_QA_SERVICE_ACCOUNT }}
+          project_id: roteiva-web-prod
+          token_format: access_token
+          access_token_lifetime: 600s
+          access_token_scopes: https://www.googleapis.com/auth/datastore
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Execute only fixed account operation (no raw identity or data in public logs)
+        working-directory: ${{ steps.bundle.outputs.release_path }}/api
+        env:
+          QA_PROTECTED_CONTROLLER: 'true'
+          QA_PROD_TARGET_EMAIL: ${{ secrets.QA_PROD_TARGET_EMAIL }}
+          QA_FIRESTORE_ACCESS_TOKEN: ${{ steps.identity.outputs.access_token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: node scripts/qa-prod-access.mjs
