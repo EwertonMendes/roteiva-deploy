@@ -34,6 +34,12 @@ PRs de origem #227 e #228 e de controlador #7, #8 e #9 integrados. A origem em m
 
 Após a virada, basta mergear o PR autorizado. O runner precisa estar online. Para promoção imediata após a criação do pacote, disparar `firebase-release.yml` no controlador com `operation=auto-dev`, `target=development` (apenas para master). O cron pode sofrer atrasos do GitHub.
 
+### CI consolidada
+
+A origem executa um workflow de CI por PR com três checks. A preparação gera um pacote por ambiente solicitado e continua automática para DEV após os checks de um push na master. O controlador mantém a aceitação das revisões anteriores durante a transição. Integre a revisão dos blobs no controlador antes de integrar os workflows da origem.
+
+Testes de PR do controlador e verificações de identidade têm grupos de concorrência próprios. As publicações ficam em fila por ambiente e compartilham o grupo PROD com a manutenção de contas de QA.
+
 ### Release manual / PR
 
 1. Na origem: `release-package.yml`, ref `master`, sha completo e target `dev` ou `prod`.
