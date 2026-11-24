@@ -9,7 +9,7 @@ const WORKFLOW_ID = 428_216_408;
 const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
 const WORKFLOW_BLOBS = new Set([
   'e251344637b6edecac7469244d745272a9a68dd9',
-  '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d','02af8c7ee7e52db79c1c1ac88972f8e40f77e591',
+  '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d','02af8c7ee7e52db79c1c1ac88972f8e40f77e591','d3cc0aa27f3a97d408912c270db5630a7539197c',
 ]);
 const REQUIRED_JOBS = [
   '01 - Quality, security & production build',
