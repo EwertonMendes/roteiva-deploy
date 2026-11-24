@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {mkdirSync,readdirSync,readFileSync,rmSync,lstatSync,statSync,writeFileSync} from 'node:fs';
-import {join,normalize,relative,resolve,sep} from 'node:path';
+import {join,relative,resolve,sep} from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 import {verifyRelease} from './verify-release-package.mjs';
 import {verifyReleaseControls} from './verify-release-controls.mjs';
 
@@ -11,6 +12,14 @@ const sha=process.env.RELEASE_SHA,target=process.env.RELEASE_TARGET;
 const token=process.env.SOURCE_READ_TOKEN;
 const packageRunId=process.env.PACKAGE_RUN_ID;
 assert.ok(token,'Missing source artifact read credential');
+function archiveCommand(command,args){
+ try{return execFileSync(command,args,{encoding:'utf8',maxBuffer:4*1024*1024,stdio:['ignore','pipe','pipe']});}
+ catch{throw new Error('Release archive operation failed.');}
+}
+function readPackageDocument(file){
+ try{return JSON.parse(readFileSync(file,'utf8'));}
+ catch{throw new Error('Release package metadata is missing or invalid.');}
+}
 const api=async path=>{
  const response=await fetch('https://api.github.com/repos/'+SOURCE+path,{
   headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token},
@@ -34,13 +43,13 @@ assert.ok(buffer.length<=200_000_000,'Artifact exceeds maximum allowed size');
 assert.equal('sha256:'+createHash('sha256').update(buffer).digest('hex'),verified.zipDigest,
  'GitHub SHA-256 artifact digest did not match');
 writeFileSync(zip,buffer,{mode:0o600});
-const zipEntries=execFileSync('unzip',['-Z1',zip],{encoding:'utf8'}).trim().split('\n');
-assert.deepEqual(zipEntries,['release-package.tar.gz'],'Unexpected or unsafe zip contents');
-execFileSync('unzip',['-qq',zip,'-d',outer],{stdio:'pipe'});
+const zipEntries=archiveCommand('unzip',['-Z1',zip]).trim().split('\n');
+assert.ok(zipEntries.length===1&&zipEntries[0]==='release-package.tar.gz','Unexpected or unsafe zip contents');
+archiveCommand('unzip',['-qq',zip,'-d',outer]);
 const tgz=join(outer,'release-package.tar.gz'),extract=join(outer,'payload');
-const entryTypes=execFileSync('tar',['-tvzf',tgz],{encoding:'utf8',maxBuffer:4*1024*1024}).split('\n').filter(Boolean);
+const entryTypes=archiveCommand('tar',['-tvzf',tgz]).split('\n').filter(Boolean);
 for(const row of entryTypes)assert.ok(['-','d'].includes(row[0]),'Release tar contains a link or non-file entry');
-const entries=execFileSync('tar',['-tzf',tgz],{encoding:'utf8',maxBuffer:4*1024*1024}).split('\n').filter(Boolean);
+const entries=archiveCommand('tar',['-tzf',tgz]).split('\n').filter(Boolean);
 assert.ok(entries.length>10&&entries.length<2000);
 for(const entry of entries){
  const clean=entry.replace(/^\.\/?/,'');
@@ -49,13 +58,10 @@ for(const entry of entries){
   !clean.includes('\\')&&!clean.includes('\0'),'Unsafe archive path');
 }
 mkdirSync(extract,{recursive:true,mode:0o700});
-execFileSync('tar',['-xzf',tgz,'--no-same-owner','--no-same-permissions','-C',extract],{stdio:'pipe'});
-const manifest=JSON.parse(readFileSync(join(extract,'release-manifest.json'),'utf8'));
-assert.equal(manifest.source,SOURCE);
-assert.equal(manifest.sourceRepositoryId,1422595328);
-assert.equal(manifest.sourceSha,sha);
-assert.equal(manifest.target,target);
-assert.equal(manifest.projectId,'roteiva-web-'+target);
+archiveCommand('tar',['-xzf',tgz,'--no-same-owner','--no-same-permissions','-C',extract]);
+const manifest=readPackageDocument(join(extract,'release-manifest.json'));
+assert.ok(manifest?.source===SOURCE&&manifest.sourceRepositoryId===1422595328&&manifest.sourceSha===sha&&
+ manifest.target===target&&manifest.projectId==='roteiva-web-'+target,'Package source or target mismatch');
 assert.ok(Array.isArray(manifest.files)&&manifest.files.length>=15);
 const observed=[];
 function walk(path){
@@ -68,20 +74,18 @@ function walk(path){
     size:st.size,sha256:createHash('sha256').update(readFileSync(absolute)).digest('hex')});
  }
 }
-walk(extract);
+try{walk(extract);}catch{throw new Error('Release payload file inspection failed.');}
 observed.sort((a,b)=>a.path.localeCompare(b.path));
-assert.deepEqual(observed,manifest.files,'Package file digest, size or listing mismatch');
+assert.ok(isDeepStrictEqual(observed,manifest.files),'Package file digest, size or listing mismatch');
 verifyReleaseControls(observed,target);
-const identity=JSON.parse(readFileSync(join(extract,'dist/roteiva-build.json'),'utf8'));
-assert.equal(identity.sha,sha);
-assert.equal(identity.projectId,'roteiva-web-'+target);
-assert.equal(identity.environment,target);
+const identity=readPackageDocument(join(extract,'dist/roteiva-build.json'));
+assert.ok(identity?.sha===sha&&identity.projectId==='roteiva-web-'+target&&identity.environment===target,'Build identity mismatch');
 if(target==='prod'){
  const flags=['PRODUCTION_BILLING_ENABLED','PRODUCTION_BILLING_CHECKOUT_ENABLED',
   'PRODUCTION_BILLING_PIX_ENABLED','PRODUCTION_BILLING_PUBLIC_ROLLOUT_ENABLED'];
  for(const flag of flags){
   assert.ok(['true','false'].includes(process.env[flag]),'Missing protected billing flag '+flag);
-  assert.equal(manifest.billing?.[flag],process.env[flag],'Production billing flag mismatch: '+flag);
+  assert.ok(manifest.billing?.[flag]===process.env[flag],'Production billing flag mismatch: '+flag);
  }
 }
 if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,'release_path='+extract+'\n',{flag:'a'});
