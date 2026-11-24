@@ -15,5 +15,7 @@ test('rejects hidden executables, changed controls and production-only content i
   for (const path of ['api/.npmrc', 'api/node_modules/wrangler/x.js', 'shared/private.mjs', 'firebase.site.prod.json', 'dist-site/index.html']) {
     assert.throws(() => releaseControlFingerprint([file(path)], 'dev'), /Unexpected file/);
   }
-  assert.throws(() => verifyReleaseControls([file('firebase.json', 'b'.repeat(64))], 'prod'), /independent review/);
+  for (const target of ['dev', 'prod']) {
+    assert.throws(() => verifyReleaseControls([file('firebase.json', 'b'.repeat(64))], target), /independent review/);
+  }
 });
