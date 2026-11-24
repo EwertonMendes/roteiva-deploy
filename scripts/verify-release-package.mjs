@@ -16,6 +16,7 @@ const WORKFLOW_BLOBS=new Set([
  'fc88079ad4c8396fb2bc27caa8992d04d68deafc',
  '51402772a05415481ae162533c716973fbcadda9',
  '7e4109c371432dd3fd1a30188ac6f3365b79883f',
+ '9e5d874006f751c111ec21e4153ea610c584ec34',
 ]);
 
 export async function verifyRelease({api,requestedSha,packageRunId,target,prNumber=''}){

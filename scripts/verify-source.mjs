@@ -13,6 +13,7 @@ const WORKFLOW_BLOBS = new Set([
   '02af8c7ee7e52db79c1c1ac88972f8e40f77e591',
   'd3cc0aa27f3a97d408912c270db5630a7539197c',
   '3df528eb74197bc8f9715d4069956c2761223bf5',
+  'cc57716de9130c3d2b2e860c804eca339314c8b3',
 ]);
 
 export function isReviewedGateWorkflow(sha) {

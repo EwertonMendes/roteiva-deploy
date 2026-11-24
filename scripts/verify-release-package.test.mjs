@@ -16,7 +16,7 @@ function fixture(options={}){
   if(path.startsWith('/commits/'))return [pr];
   if(path==='/pulls/222')return pr;
   if(path==='/actions/workflows/428216408')return {id:428216408,path:'.github/workflows/qa-production-gates.yml',state:'active'};
-  if(path.includes('qa-production-gates.yml'))return {sha:'9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d'};
+  if(path.includes('qa-production-gates.yml'))return {sha:options.gateBlob||'9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d'};
   if(path==='/actions/workflows/'+id)return {id,path:'.github/workflows/release-package.yml',state:'active'};
   if(path.includes('release-package.yml'))return {sha:options.blob||'248f7a0c870d4551ceedc244b8f50a3bceee13fe'};
   if(path.includes('428216408/runs'))return {workflow_runs:[{id:45278221929,status:'completed',conclusion:'success',
@@ -62,4 +62,11 @@ test('allows reviewed automatic package only for DEV, not production',async()=>{
  assert.equal(dev.artifactId,432100);
  await assert.rejects(verifyRelease({api:fixture({runEvent:'workflow_run'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
  await assert.rejects(verifyRelease({api:fixture({runEvent:'push'}),requestedSha:sha,packageRunId:runId,target:'dev'}));
+});
+
+test('accepts the reviewed consolidated gate and packaging workflows',async()=>{
+ const api=fixture({gateBlob:'cc57716de9130c3d2b2e860c804eca339314c8b3',
+  blob:'9e5d874006f751c111ec21e4153ea610c584ec34',runEvent:'workflow_run'});
+ const release=await verifyRelease({api,requestedSha:sha,packageRunId:runId,target:'dev'});
+ assert.equal(release.artifactId,432100);
 });

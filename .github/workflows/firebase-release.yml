@@ -52,8 +52,11 @@ on:
         options: [development, production]
 permissions: {}
 concurrency:
-  group: firebase-release-identity-${{ inputs.target || 'development' }}
-  cancel-in-progress: false
+  group: >-
+    ${{ github.event_name == 'pull_request' && format('controller-ci-{0}', github.event.pull_request.number) ||
+        inputs.operation == 'verify' && format('firebase-verify-{0}', inputs.target) ||
+        format('firebase-release-identity-{0}', inputs.target || 'development') }}
+  queue: max
 jobs:
   test:
     if: github.event_name == 'pull_request'

@@ -22,7 +22,7 @@ on:
 permissions: {}
 concurrency:
   group: firebase-release-identity-production
-  cancel-in-progress: false
+  queue: max
 jobs:
   authorize:
     if: >-
