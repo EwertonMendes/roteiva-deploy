@@ -6,7 +6,7 @@ on:
       - '.github/workflows/firebase-release.yml'
       - 'scripts/**'
   schedule:
-    - cron: '17,47 * * * *'
+    - cron: '3-58/5 * * * *'
   workflow_dispatch:
     inputs:
       operation:
@@ -111,8 +111,10 @@ jobs:
       ready: ${{ steps.selection.outputs.ready || steps.manual.outputs.ready }}
       sha: ${{ steps.selection.outputs.sha || steps.manual.outputs.sha }}
       package_run: ${{ steps.selection.outputs.package_run || steps.manual.outputs.package_run }}
+      receipt_id: ${{ steps.receipt.outputs.id }}
     permissions:
       contents: read
+      deployments: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -136,6 +138,7 @@ jobs:
         env:
           SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
           MANUAL_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' }}
+          CONTROLLER_RECEIPT_TOKEN: ${{ github.token }}
         run: node scripts/select-dev-release.mjs
       - name: Guard target and manually approved options
         if: contains(fromJSON('["release","preview","site","observability","qa-infra"]'), inputs.operation)
@@ -206,6 +209,29 @@ jobs:
         run: |
           node scripts/verify-release-package.mjs
           echo ready=true >> "$GITHUB_OUTPUT"
+      - name: Record durable DEV master release attempt (no cloud credentials)
+        id: receipt
+        if: >-
+          (steps.selection.outputs.ready == 'true' || steps.manual.outputs.ready == 'true') &&
+          (github.event_name == 'schedule' || inputs.operation == 'auto-dev' ||
+           (inputs.operation == 'release' && inputs.target == 'development' && inputs.pr_number == '' &&
+            !inputs.frontend_only && !inputs.worker_only && !inputs.firestore_only))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.selection.outputs.sha || steps.manual.outputs.sha }}
+          PACKAGE_RUN: ${{ steps.selection.outputs.package_run || steps.manual.outputs.package_run }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$PACKAGE_RUN" =~ ^[0-9]+$ ]]
+          id="$(jq -n --arg ref "$GITHUB_SHA" --arg sha "$SOURCE_SHA" --arg run "$PACKAGE_RUN" '
+            {ref:$ref,environment:"roteiva-dev-release-receipts",task:"roteiva-dev-release",auto_merge:false,
+             required_contexts:[],production_environment:false,transient_environment:true,
+             payload:{source_sha:$sha,package_run_id:$run}}' |
+            gh api --method POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)"
+          [[ "$id" =~ ^[0-9]+$ ]]
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" -f state=in_progress -f description="Verified DEV master release" >/dev/null
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
   worker:
     name: Publish Cloudflare Worker and D1 (protected)
@@ -416,3 +442,25 @@ jobs:
             node scripts/verify-hosting-cache.mjs https://roteiva-web-dev.web.app
           fi
           if [ "$FRONTEND_ONLY" != true ]; then node scripts/smoke-environment.mjs "$RELEASE_TARGET"; fi
+
+  receipt:
+    name: Finalize DEV release receipt
+    needs: [preflight, worker, firebase]
+    if: always() && needs.preflight.outputs.receipt_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      deployments: write
+    steps:
+      - name: Persist success or failure without touching cloud services
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECEIPT_ID: ${{ needs.preflight.outputs.receipt_id }}
+          WORKER: ${{ needs.worker.result }}
+          FIREBASE: ${{ needs.firebase.result }}
+        run: |
+          set -euo pipefail
+          [[ "$RECEIPT_ID" =~ ^[0-9]+$ ]]
+          state=failure
+          if [ "$WORKER" = success ] && [ "$FIREBASE" = success ]; then state=success; fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$RECEIPT_ID/statuses" -f state="$state" -f description="DEV release $state" >/dev/null
