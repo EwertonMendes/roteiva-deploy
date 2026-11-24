@@ -38,3 +38,11 @@ test('explicit rehearsal accepts a verified manual DEV package',async()=>{
  const f=fixture({private:false,event:'workflow_dispatch'});
  assert.deepEqual(await selectDevRelease({...f,manual:true}),{sha,packageRunId:100001});
 });
+
+test('scheduled controller never overwrites an explicitly promoted PR after master was processed',async()=>{
+ const f=fixture();
+ assert.equal(await selectDevRelease({...f,alreadyAttempted:async s=>s===sha}),null);
+ assert.ok(!f.calls.includes('verify'));
+ const manual=fixture();
+ assert.deepEqual(await selectDevRelease({...manual,manual:true,alreadyAttempted:async()=>true}),{sha,packageRunId:100001});
+});
