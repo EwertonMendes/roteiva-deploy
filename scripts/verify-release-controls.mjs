@@ -6,6 +6,8 @@ const approved = {
     'e2c0c05001622065d798a97d51c514a055c4522c0e6ec46a8ae45dc28b73ca09',
     // Adds the exact review-list revision migration to the additive migration guard.
     '01897cbb0a4538c4c096de37446e4a49d9d0a14757445529f05728fc0a8026f7',
+    // DEV-only: exact additive migration guard revision, pending independent review.
+    '8768ff1460c8651b1532945641e246b8413c2f2cb32fcf39c5ac661afe95943d',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
