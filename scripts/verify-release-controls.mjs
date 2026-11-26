@@ -21,6 +21,8 @@ const approved = {
     '93a747c76eab7892ffac709d6a741386387f76ce5ada49a93364c2923310f962',
     // Same exact Hosting rewrite changes in PROD; no auth, Firestore, Worker or deployment executable changes.
     '4b4813da4760e128e9b4b032634960177d7e58a4784d928a7935bbce72ee5ef7',
+    // Source PR #250 adds DEV-only queue bindings to the shared Wrangler file.
+    '6eb01d59689c3294235c4cc255232a4eeae79768b192b9b9b6e9bccf39d1eb88',
   ],
 };
 
