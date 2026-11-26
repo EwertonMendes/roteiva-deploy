@@ -1,4 +1,6 @@
-name: Verify release source
+name: DEV and PROD - Verify release artifact
+run-name: >-
+  ${{ inputs.target == 'prod' && 'PROD' || 'DEV' }} | ${{ inputs.package_run_id != '' && 'Verify release artifact (no publish)' || 'Verify release source and CI (no publish)' }}
 on:
   workflow_dispatch:
     inputs:

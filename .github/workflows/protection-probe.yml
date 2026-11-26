@@ -1,4 +1,6 @@
-name: Exercise environment protection
+name: DEV and PROD - Deployment approval test
+run-name: >-
+  ${{ inputs.target == 'production' && 'PROD' || 'DEV' }} | Test deployment approval (no publish)
 on:
   workflow_dispatch:
     inputs:

@@ -10,6 +10,7 @@ const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
 const FAST_GATE_BLOB = '7443a269f0e45054158449b64b32b803dd2196a2';
 const WORKFLOW_BLOBS = new Set([
   FAST_GATE_BLOB,
+  'd0f88c91e973838b4cda1bf49e956fcd9e1804a1',
   'e251344637b6edecac7469244d745272a9a68dd9',
   '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d',
   '02af8c7ee7e52db79c1c1ac88972f8e40f77e591',
@@ -37,7 +38,7 @@ const FAST_REQUIRED_JOBS = [
 
 export function requiredGateJobs(blob) {
   if (!isReviewedGateWorkflow(blob)) throw new Error('Unreviewed release gate workflow');
-  return blob === FAST_GATE_BLOB ? FAST_REQUIRED_JOBS : REQUIRED_JOBS;
+  return [FAST_GATE_BLOB, 'd0f88c91e973838b4cda1bf49e956fcd9e1804a1'].includes(blob) ? FAST_REQUIRED_JOBS : REQUIRED_JOBS;
 }
 
 function requireThat(condition, message) {

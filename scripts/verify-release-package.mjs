@@ -7,7 +7,7 @@ import {verifyPrSource} from './verify-pr-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
-const DUAL_PACKAGE_BLOBS=new Set(['9d95de351bff2b639f930e3747d8c63cecd577b1','303c729bd04d4477a01d9be9fc4f87d6d1b4c721']);
+const DUAL_PACKAGE_BLOBS=new Set(['9d95de351bff2b639f930e3747d8c63cecd577b1','303c729bd04d4477a01d9be9fc4f87d6d1b4c721','261b977d1ae6d46a063e95e3fa63487b5aa1b1db']);
 const WORKFLOW_BLOBS=new Set([
  ...DUAL_PACKAGE_BLOBS,
  '248f7a0c870d4551ceedc244b8f50a3bceee13fe',
