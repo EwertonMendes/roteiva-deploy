@@ -7,7 +7,7 @@ const OWNER_ID = 33_728_924;
 const BRANCH = 'master';
 const WORKFLOW_ID = 428_216_408;
 const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
-const FAST_GATE_BLOB = 'b2caf15c235f9d993528373210f87021c21f2824';
+const FAST_GATE_BLOB = '7443a269f0e45054158449b64b32b803dd2196a2';
 const WORKFLOW_BLOBS = new Set([
   FAST_GATE_BLOB,
   'e251344637b6edecac7469244d745272a9a68dd9',
