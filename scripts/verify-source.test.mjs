@@ -65,7 +65,7 @@ test('rejects PR-only runs, skipped jobs and anonymous private rehearsals', asyn
   await assert.rejects(verifySource({ api: fixture(), requestedSha: sha, publicProbe: true }), /public source/);
 });
 
-const fastBlob='b2caf15c235f9d993528373210f87021c21f2824';
+const fastBlob='7443a269f0e45054158449b64b32b803dd2196a2';
 const fastNames=["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"];
 test('requires every job from the reviewed fast gate, not just legacy job names',async()=>{
  await verifySource({api:fixture({sourceBlob:fastBlob,names:fastNames}),requestedSha:sha});

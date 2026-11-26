@@ -71,7 +71,7 @@ test('accepts the reviewed consolidated gate and packaging workflows',async()=>{
  assert.equal(release.artifactId,432100);
 });
 
-const dualOptions={gateBlob:'b2caf15c235f9d993528373210f87021c21f2824',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"],blob:'9d95de351bff2b639f930e3747d8c63cecd577b1',runEvent:'workflow_run',packageTarget:'both'};
+const dualOptions={gateBlob:'7443a269f0e45054158449b64b32b803dd2196a2',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"],blob:'9d95de351bff2b639f930e3747d8c63cecd577b1',runEvent:'workflow_run',packageTarget:'both'};
 test('reuses one reviewed master package run for target-specific DEV and PROD artifacts',async()=>{
  const dev=await verifyRelease({api:fixture(dualOptions),requestedSha:sha,packageRunId:runId,target:'dev'});
  const prod=await verifyRelease({api:fixture({...dualOptions,artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'});

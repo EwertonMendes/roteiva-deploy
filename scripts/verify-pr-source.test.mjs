@@ -34,7 +34,7 @@ test('rejects PR production, foreign/closed/stale PR, altered gates and non-owne
 });
 
 test('fast gate supports DEV-only PR artifacts and rejects dual PR artifacts',async()=>{
- const opts={gateBlob:'b2caf15c235f9d993528373210f87021c21f2824',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"],packageBlob:'9d95de351bff2b639f930e3747d8c63cecd577b1'};
+ const opts={gateBlob:'7443a269f0e45054158449b64b32b803dd2196a2',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"],packageBlob:'9d95de351bff2b639f930e3747d8c63cecd577b1'};
  await verifyRelease({api:fixture(opts),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'});
  await assert.rejects(verifyRelease({api:fixture({...opts,packageTarget:'both'}),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'}));
 });
