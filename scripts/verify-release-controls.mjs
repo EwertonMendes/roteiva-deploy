@@ -12,6 +12,8 @@ const approved = {
     '4b5b511328b4b319aad34f9dccc6f0ccf185295082a78d7dceba3f81c171a170',
     // Source PR #250: DEV project deletion Queue and DLQ bindings only.
     '1e0ca9b9c6e271105ae79fbea2f708f89b722456b56d25ee1610f788e9ced1ad',
+    // Adds isolated PROD Queue bindings and pins the additive deletion checkpoint/budget migration.
+    '5aa99e06691964172ac4a4b5603de56196d30923a83077f57ba80274f9c3a1a9',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
@@ -23,6 +25,8 @@ const approved = {
     '4b4813da4760e128e9b4b032634960177d7e58a4784d928a7935bbce72ee5ef7',
     // Source PR #250 adds DEV-only queue bindings to the shared Wrangler file.
     '6eb01d59689c3294235c4cc255232a4eeae79768b192b9b9b6e9bccf39d1eb88',
+    // Same exact controls as DEV with the reviewed production Hosting configuration.
+    '5eca70bc33658d05662984a1102ce26e3bfbc5ad39f72f06b2d7501b9b564fd7',
   ],
 };
 
