@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import {isReviewedGateWorkflow} from './verify-source.mjs';
+import {isReviewedGateWorkflow,requiredGateJobs} from './verify-source.mjs';
 const SOURCE='EwertonMendes/roteiva-web',ID=1422595328,OWNER=33728924,GATE=428216408;
-const JOBS=['01 - Quality, security & production build','02 - E2E Access, billing & tenant isolation','03 - E2E Projects, finance, Drive & approvals'];
 export async function verifyPrSource({api,requestedSha,prNumber}){
  assert.match(requestedSha||'',/^[a-f0-9]{40}$/);
  assert.match(String(prNumber||''),/^[1-9][0-9]{0,8}$/);
@@ -25,7 +24,7 @@ export async function verifyPrSource({api,requestedSha,prNumber}){
   (r.event==='pull_request'||(r.event==='workflow_dispatch'&&r.actor?.id===OWNER)));
  assert.ok(Number.isSafeInteger(run?.id)&&run.status==='completed'&&run.conclusion==='success','PR quality checks are not green');
  const result=await api('/actions/runs/'+run.id+'/jobs?filter=latest&per_page=100');
- assert.ok(JOBS.every(name=>{
+ assert.ok(requiredGateJobs(revision.sha).every(name=>{
   const matches=result.jobs?.filter(j=>j.name===name);
   return matches?.length===1&&matches[0].status==='completed'&&matches[0].conclusion==='success';
  }),'Missing green PR release checks');

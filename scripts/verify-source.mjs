@@ -7,7 +7,9 @@ const OWNER_ID = 33_728_924;
 const BRANCH = 'master';
 const WORKFLOW_ID = 428_216_408;
 const WORKFLOW_PATH = '.github/workflows/qa-production-gates.yml';
+const FAST_GATE_BLOB = 'b2caf15c235f9d993528373210f87021c21f2824';
 const WORKFLOW_BLOBS = new Set([
+  FAST_GATE_BLOB,
   'e251344637b6edecac7469244d745272a9a68dd9',
   '9ca5ebbc1c6efbf2a3910efd65e853c4b4af4d1d',
   '02af8c7ee7e52db79c1c1ac88972f8e40f77e591',
@@ -24,6 +26,19 @@ const REQUIRED_JOBS = [
   '02 - E2E Access, billing & tenant isolation',
   '03 - E2E Projects, finance, Drive & approvals',
 ];
+
+const FAST_REQUIRED_JOBS = [
+  "01 - Frontend | unit, types and build",
+  "02 - API | unit, types, D1 and security",
+  "03 - Firestore | tenant and access rules",
+  "04 - E2E | access, payments and tenant isolation",
+  "05 - E2E | impacted product and media smoke"
+];
+
+export function requiredGateJobs(blob) {
+  if (!isReviewedGateWorkflow(blob)) throw new Error('Unreviewed release gate workflow');
+  return blob === FAST_GATE_BLOB ? FAST_REQUIRED_JOBS : REQUIRED_JOBS;
+}
 
 function requireThat(condition, message) {
   if (!condition) throw new Error(message);
@@ -68,7 +83,7 @@ export async function verifySource({ api, requestedSha, publicProbe }) {
     'The latest master-push checks for this SHA have not succeeded.');
 
   const result = await api('/actions/runs/' + run.id + '/jobs?filter=latest&per_page=100');
-  requireThat(REQUIRED_JOBS.every(name => {
+  requireThat(requiredGateJobs(revision.sha).every(name => {
     const jobs = result.jobs?.filter(job => job.name === name);
     return jobs?.length === 1 && jobs[0].status === 'completed' && jobs[0].conclusion === 'success';
   }), 'A required release job did not finish successfully.');

@@ -7,7 +7,9 @@ import {verifyPrSource} from './verify-pr-source.mjs';
 // Never accept a controller-supplied workflow revision or a generic artifact name.
 const SOURCE='EwertonMendes/roteiva-web',SOURCE_ID=1422595328,OWNER_ID=33728924;
 const WORKFLOW_ID=428402383,WORKFLOW_PATH='.github/workflows/release-package.yml';
+const DUAL_PACKAGE_BLOB='9d95de351bff2b639f930e3747d8c63cecd577b1';
 const WORKFLOW_BLOBS=new Set([
+ DUAL_PACKAGE_BLOB,
  '248f7a0c870d4551ceedc244b8f50a3bceee13fe',
  'ee8c582f39c1bd4aeadbe86a663f7b862f968c3a',
  'e885f7adfe9c4e231dd7501ef5923d1b6ee0b17e',
@@ -29,18 +31,21 @@ export async function verifyRelease({api,requestedSha,packageRunId,target,prNumb
   throw Error('The reviewed packaging workflow is unavailable');
  const revision=await api('/contents/'+WORKFLOW_PATH+'?ref='+requestedSha);
  if(!WORKFLOW_BLOBS.has(revision.sha))throw Error('Source package workflow requires independent controller review');
+ const dual=revision.sha===DUAL_PACKAGE_BLOB;
  // REST GET /actions/runs/{id} omits workflow_dispatch inputs. Instead bind
  // immutable SHA, target and owner through run metadata, job and artifact name.
  const run=await api('/actions/runs/'+packageRunId);
  if(run.id!==Number(packageRunId)||run.workflow_id!==WORKFLOW_ID||
     run.head_sha!==requestedSha||run.head_branch!==(prNumber?gate.branch:'master')||
-    !(run.event==='workflow_dispatch'||(!prNumber&&target==='dev'&&run.event==='workflow_run'))||
+    !(run.event==='workflow_dispatch'||(!prNumber&&(target==='dev'||dual)&&run.event==='workflow_run'))||
     run.conclusion!=='success'||run.status!=='completed'||
     run.repository?.id!==SOURCE_ID||run.head_repository?.id!==SOURCE_ID||
     run.actor?.id!==OWNER_ID)
   throw Error('Package execution lacks immutable owner/source/target provenance');
  const jobs=await api('/actions/runs/'+packageRunId+'/jobs?filter=latest&per_page=100');
- const packaging=jobs.jobs?.filter(j=>j.name==='Source-only release package ('+target+')');
+ const expectedNames=dual&&!prNumber&&run.event==='workflow_run' ? ['Source-only release package (both)'] :
+  ['Source-only release package ('+target+')', ...(dual&&!prNumber?['Source-only release package (both)']:[])];
+ const packaging=jobs.jobs?.filter(j=>expectedNames.includes(j.name));
  if(packaging?.length!==1||packaging[0].conclusion!=='success'||packaging[0].status!=='completed')
   throw Error('Required release packaging job did not succeed');
  const artifacts=await api('/actions/runs/'+packageRunId+'/artifacts?per_page=100');

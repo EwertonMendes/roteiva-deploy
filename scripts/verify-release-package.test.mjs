@@ -21,20 +21,20 @@ function fixture(options={}){
   if(path.includes('release-package.yml'))return {sha:options.blob||'248f7a0c870d4551ceedc244b8f50a3bceee13fe'};
   if(path.includes('428216408/runs'))return {workflow_runs:[{id:45278221929,status:'completed',conclusion:'success',
    workflow_id:428216408,head_branch:'master',head_sha:sha,event:'push',repository:source,head_repository:source}]};
-  if(path.includes('/actions/runs/45278221929/jobs'))return {jobs:[
+  if(path.includes('/actions/runs/45278221929/jobs'))return {jobs:(options.names||[
    '01 - Quality, security & production build',
    '02 - E2E Access, billing & tenant isolation',
    '03 - E2E Projects, finance, Drive & approvals'
-   ].map(name=>({name,status:'completed',conclusion:'success'}))};
+   ]).map(name=>({name,status:'completed',conclusion:'success'}))};
   if(path==='/actions/runs/'+runId)return {id:runId,workflow_id:id,head_sha:sha,head_branch:'master',
    status:'completed',conclusion:'success',event:options.runEvent||'workflow_dispatch',repository:source,
    head_repository:source,actor:options.actor||owner,
    };
   if(path.includes('/actions/runs/'+runId+'/jobs'))return {jobs:[{
-   name:'Source-only release package (dev)',status:'completed',conclusion:'success'
+   name:'Source-only release package ('+(options.packageTarget||'dev')+')',status:'completed',conclusion:'success'
   }]};
   if(path.includes('/actions/runs/'+runId+'/artifacts'))return {artifacts:[{
-   id:432100,name:'roteiva-release-dev-'+sha,expired:false,
+   id:432100,name:'roteiva-release-'+(options.artifactTarget||'dev')+'-'+sha,expired:false,
    workflow_run:{head_sha:sha},digest:options.digest||digest,size_in_bytes:12345
   }]};
   throw Error('Unexpected test request: '+path);
@@ -69,4 +69,15 @@ test('accepts the reviewed consolidated gate and packaging workflows',async()=>{
   blob:'9e5d874006f751c111ec21e4153ea610c584ec34',runEvent:'workflow_run'});
  const release=await verifyRelease({api,requestedSha:sha,packageRunId:runId,target:'dev'});
  assert.equal(release.artifactId,432100);
+});
+
+const dualOptions={gateBlob:'b2caf15c235f9d993528373210f87021c21f2824',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"],blob:'9d95de351bff2b639f930e3747d8c63cecd577b1',runEvent:'workflow_run',packageTarget:'both'};
+test('reuses one reviewed master package run for target-specific DEV and PROD artifacts',async()=>{
+ const dev=await verifyRelease({api:fixture(dualOptions),requestedSha:sha,packageRunId:runId,target:'dev'});
+ const prod=await verifyRelease({api:fixture({...dualOptions,artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'});
+ assert.equal(dev.packageRunId,prod.packageRunId);
+ assert.equal(prod.target,'prod');
+ await assert.rejects(verifyRelease({api:fixture(dualOptions),requestedSha:sha,packageRunId:runId,target:'prod'}));
+ await assert.rejects(verifyRelease({api:fixture({...dualOptions,packageTarget:'dev',artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
+ await assert.rejects(verifyRelease({api:fixture({...dualOptions,names:dualOptions.names.slice(0,-1),artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
 });
