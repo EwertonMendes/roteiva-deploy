@@ -8,6 +8,8 @@ const approved = {
     '01897cbb0a4538c4c096de37446e4a49d9d0a14757445529f05728fc0a8026f7',
     // DEV-only: exact additive migration guard revision, pending independent review.
     '8768ff1460c8651b1532945641e246b8413c2f2cb32fcf39c5ac661afe95943d',
+    // Source PR #245: only two /review Hosting rewrites changed; all other controls match the previous reviewed release.
+    '4b5b511328b4b319aad34f9dccc6f0ccf185295082a78d7dceba3f81c171a170',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
@@ -15,6 +17,8 @@ const approved = {
     'de808f12894c50f8d32d432446ada76be888e6ff7d215c60b2cf4eeecbc97445',
     // Exact additive nullable review-comment avatar migration, already validated in DEV.
     '93a747c76eab7892ffac709d6a741386387f76ce5ada49a93364c2923310f962',
+    // Same exact Hosting rewrite changes in PROD; no auth, Firestore, Worker or deployment executable changes.
+    '4b4813da4760e128e9b4b032634960177d7e58a4784d928a7935bbce72ee5ef7',
   ],
 };
 
