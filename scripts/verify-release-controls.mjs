@@ -13,6 +13,8 @@ const approved = {
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
     // Same reviewed additive migration as DEV, with the production configuration.
     'de808f12894c50f8d32d432446ada76be888e6ff7d215c60b2cf4eeecbc97445',
+    // Exact additive nullable review-comment avatar migration, already validated in DEV.
+    '93a747c76eab7892ffac709d6a741386387f76ce5ada49a93364c2923310f962',
   ],
 };
 
