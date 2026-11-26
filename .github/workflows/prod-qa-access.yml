@@ -1,4 +1,6 @@
-name: Protected PROD QA account maintenance
+name: PROD - QA account access maintenance
+run-name: >-
+  PROD | ${{ inputs.action == 'verify-permissions' && 'Verify QA access permissions' || inputs.action == 'check' && 'Check QA account access' || inputs.action == 'expire' && 'Expire QA trial' || 'Restore QA trial' }}
 on:
   workflow_dispatch:
     inputs:

@@ -38,3 +38,10 @@ test('fast gate supports DEV-only PR artifacts and rejects dual PR artifacts',as
  await verifyRelease({api:fixture(opts),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'});
  await assert.rejects(verifyRelease({api:fixture({...opts,packageTarget:'both'}),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'}));
 });
+
+
+test('renamed reviewed workflows retain DEV-only PR releases',async()=>{
+ const opts={gateBlob:'d0f88c91e973838b4cda1bf49e956fcd9e1804a1',packageBlob:'261b977d1ae6d46a063e95e3fa63487b5aa1b1db',names:["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"]};
+ await verifyRelease({api:fixture(opts),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'});
+ await assert.rejects(verifyRelease({api:fixture({...opts,packageTarget:'both'}),requestedSha:sha,prNumber:'42',packageRunId:123457,target:'dev'}));
+});

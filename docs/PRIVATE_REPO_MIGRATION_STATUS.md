@@ -66,3 +66,7 @@ Os conectores não podem alterar visibilidade do repositório, registrar runner 
 2. Para diagnóstico de capacidade e operação do pool, consulte a documentação de desenvolvimento da origem privada. Os perfis de CI e empacotamento usam labels distintos. Com o PC indisponível os checks permanecem pendentes.
 3. Conferir os gates do SHA final, o pacote imutável e o receipt DEV. Para PROD, usar o SHA aprovado e as duas aprovações protegidas. Durante recuperação, manter a origem privada e restaurar a última versão compatível nos provedores.
 4. Confirmar periodicamente o acesso pelos conectores e renovar o token de leitura antes da expiração. Armazenar valores de runtime e material de recuperação no cofre autorizado.
+
+### Títulos no Actions
+
+As execuções identificam destino e ação, por exemplo `DEV | Deploy app and API`, `PROD | Deploy app and API`, `DEV | Deploy Worker and D1`, `DEV | Check and deploy ready release` e `Controller | Validate release policies (PR #...)`. Validação e pacote compartilhados da origem exibem `DEV/PROD`; títulos de QA em emuladores não sugerem deploy. Os nomes e IDs de jobs de procedência na origem, ambientes protegidos, paths e inputs dos workflows não mudam. Os blobs novos são autorizados explicitamente, sem remover as verificações anteriores.

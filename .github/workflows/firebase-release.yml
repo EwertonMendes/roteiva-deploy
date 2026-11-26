@@ -1,4 +1,18 @@
-name: Verify Firebase release identity
+name: Deploy and verify DEV and PROD (Cloudflare and Firebase)
+run-name: >-
+  ${{ github.event_name == 'pull_request' && 'Controller' || github.event_name == 'schedule' && 'DEV' || inputs.target == 'production' && 'PROD' || 'DEV' }} |
+  ${{ github.event_name == 'pull_request' && format('Validate release policies (PR #{0})', github.event.pull_request.number) ||
+      (github.event_name == 'schedule' || inputs.operation == 'auto-dev') && 'Check and deploy ready release' ||
+      inputs.operation == 'verify' && 'Verify Firebase deploy permissions' ||
+      inputs.operation == 'preview' && 'Deploy PR preview' ||
+      inputs.operation == 'site' && 'Deploy institutional website' ||
+      inputs.operation == 'observability' && 'Update Worker observability' ||
+      inputs.operation == 'qa-infra' && 'Prepare QA infrastructure' ||
+      inputs.worker_only && 'Deploy Worker and D1' ||
+      inputs.firestore_only && 'Deploy Firestore rules and indexes' ||
+      inputs.frontend_only && 'Deploy app Hosting' ||
+      inputs.pr_number != '' && format('Deploy app and API (PR #{0})', inputs.pr_number) ||
+      'Deploy app and API' }}
 on:
   pull_request:
     branches: [master]
@@ -59,6 +73,7 @@ concurrency:
   queue: max
 jobs:
   test:
+    name: Validate controller release policies
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -69,6 +84,7 @@ jobs:
           persist-credentials: false
       - run: node --test scripts/*.test.mjs
   verify:
+    name: Verify Firebase deployment permissions
     if: >-
       github.repository_id == '1469367994' && github.ref == 'refs/heads/master' &&
       github.actor_id == '33728924' && github.event_name == 'workflow_dispatch' && inputs.operation == 'verify' && contains(fromJSON('["development","production"]'), inputs.target)

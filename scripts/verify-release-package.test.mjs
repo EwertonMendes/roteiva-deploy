@@ -88,3 +88,12 @@ test('accepts the reviewed literal workflow name filter for the same dual-target
  const prod=await verifyRelease({api:fixture({...options,artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'});
  assert.equal(dev.packageRunId,prod.packageRunId);
 });
+
+
+test('accepts the renamed reviewed workflows without changing the five-gate or dual-artifact contract',async()=>{
+ const options={...dualOptions,gateBlob:'d0f88c91e973838b4cda1bf49e956fcd9e1804a1',blob:'261b977d1ae6d46a063e95e3fa63487b5aa1b1db'};
+ const dev=await verifyRelease({api:fixture(options),requestedSha:sha,packageRunId:runId,target:'dev'});
+ const prod=await verifyRelease({api:fixture({...options,artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'});
+ assert.equal(dev.packageRunId,prod.packageRunId);
+ await assert.rejects(verifyRelease({api:fixture({...options,names:options.names.slice(0,-1),artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
+});

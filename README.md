@@ -2,9 +2,9 @@
 
 Controlador público de releases do Roteiva. A política e os workflows são públicos. Código, dados e artefatos de compilação ficam no repositório de origem.
 
-- **Verify release source** confere o commit atual da master, o PR mesclado, a revisão conhecida do workflow e os três gates daquele SHA.
-- **Exercise environment protection** executa somente um teste de aprovação. Selecione o destino no disparo manual. O modo production passa pelos dois gates do GitHub, em sequência.
-- **Verify Firebase release identity** obtém credencial curta por OIDC no ambiente selecionado e verifica as permissões para Hosting, regras e índices, incluindo a separação entre os projetos. A execução de produção exige o gate do GitHub. As operações desta versão são somente de verificação.
+- **DEV and PROD - Verify release artifact** confere o commit atual da master, o PR mesclado, a revisão conhecida do workflow e todos os gates exigidos daquele SHA.
+- **DEV and PROD - Deployment approval test** executa somente um teste de aprovação. Selecione o destino no disparo manual. O modo production passa pelos dois gates do GitHub, em sequência.
+- **Deploy and verify DEV and PROD (Cloudflare and Firebase)** publica a API/Worker, D1, Hosting e Firestore conforme o ambiente e a operação selecionada. O título de cada execução distingue deploy completo, parcial, verificação de permissões e busca automática de release DEV. A publicação PROD continua protegida por aprovação. O modo `verify` apenas verifica permissões do Firebase.
 
 O token de leitura deve ficar no ambiente `source-read`. Use um token fine-grained limitado a `roteiva-web`, com Actions, Contents e Pull requests em leitura. Confira expiração e escopo após cada renovação. A leitura anônima existe para o ensaio público e exige que o repositório ainda seja público.
 
