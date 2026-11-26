@@ -10,6 +10,8 @@ const approved = {
     '8768ff1460c8651b1532945641e246b8413c2f2cb32fcf39c5ac661afe95943d',
     // Source PR #245: only two /review Hosting rewrites changed; all other controls match the previous reviewed release.
     '4b5b511328b4b319aad34f9dccc6f0ccf185295082a78d7dceba3f81c171a170',
+    // Source PR #250: DEV project deletion Queue and DLQ bindings only.
+    '1e0ca9b9c6e271105ae79fbea2f708f89b722456b56d25ee1610f788e9ced1ad',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
