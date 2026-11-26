@@ -81,3 +81,10 @@ test('reuses one reviewed master package run for target-specific DEV and PROD ar
  await assert.rejects(verifyRelease({api:fixture({...dualOptions,packageTarget:'dev',artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
  await assert.rejects(verifyRelease({api:fixture({...dualOptions,names:dualOptions.names.slice(0,-1),artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'}));
 });
+
+test('accepts the reviewed literal workflow name filter for the same dual-target artifact contract',async()=>{
+ const options={...dualOptions,blob:'303c729bd04d4477a01d9be9fc4f87d6d1b4c721'};
+ const dev=await verifyRelease({api:fixture(options),requestedSha:sha,packageRunId:runId,target:'dev'});
+ const prod=await verifyRelease({api:fixture({...options,artifactTarget:'prod'}),requestedSha:sha,packageRunId:runId,target:'prod'});
+ assert.equal(dev.packageRunId,prod.packageRunId);
+});
