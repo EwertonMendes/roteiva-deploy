@@ -23,7 +23,7 @@ const pullRequest = {
 };
 
 function fixture({ privateSource = true, jobConclusion = 'success', event = 'push',
-  sourceBlob = blob, merger = owner, branchSha = sha, finalSha = branchSha } = {}) {
+  sourceBlob = blob, names = jobNames, merger = owner, branchSha = sha, finalSha = branchSha } = {}) {
   let reads = 0;
   return async path => {
     if (!path) return { ...repository, full_name: 'EwertonMendes/roteiva-web',
@@ -36,7 +36,7 @@ function fixture({ privateSource = true, jobConclusion = 'success', event = 'pus
     if (path.includes('/runs?')) return { workflow_runs: [{ id: 45278221929, head_sha: sha,
       event, head_branch: 'master', conclusion: 'success', status: 'completed', workflow_id: workflowId,
       repository, head_repository: repository }] };
-    if (path.includes('/jobs?')) return { jobs: jobNames.map(name => ({
+    if (path.includes('/jobs?')) return { jobs: names.map(name => ({
       name, status: 'completed', conclusion: jobConclusion,
     })) };
     throw new Error('Unexpected API request: ' + path);
@@ -63,4 +63,12 @@ test('rejects PR-only runs, skipped jobs and anonymous private rehearsals', asyn
   await assert.rejects(verifySource({ api: fixture({ event: 'pull_request' }), requestedSha: sha }), /master-push checks/);
   await assert.rejects(verifySource({ api: fixture({ jobConclusion: 'skipped' }), requestedSha: sha }), /required release job/);
   await assert.rejects(verifySource({ api: fixture(), requestedSha: sha, publicProbe: true }), /public source/);
+});
+
+const fastBlob='b2caf15c235f9d993528373210f87021c21f2824';
+const fastNames=["01 - Frontend | unit, types and build","02 - API | unit, types, D1 and security","03 - Firestore | tenant and access rules","04 - E2E | access, payments and tenant isolation","05 - E2E | impacted product and media smoke"];
+test('requires every job from the reviewed fast gate, not just legacy job names',async()=>{
+ await verifySource({api:fixture({sourceBlob:fastBlob,names:fastNames}),requestedSha:sha});
+ await assert.rejects(verifySource({api:fixture({sourceBlob:fastBlob,names:fastNames.slice(0,-1)}),requestedSha:sha}),/required release job/);
+ await assert.rejects(verifySource({api:fixture({sourceBlob:fastBlob}),requestedSha:sha}),/required release job/);
 });
