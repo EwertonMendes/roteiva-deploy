@@ -23,7 +23,7 @@ PRs de origem #227 e #228 e de controlador #7, #8 e #9 integrados. A origem em m
 
 - `roteiva-web`: código, CI, pacotes, artefatos e logs de compilação. O pool usa VMs Linux efêmeras sob demanda, sem credenciais de publicação de repositório. O perfil de empacotamento leve reduz concorrência com as suítes que usam emuladores.
 - `roteiva-deploy`: política de release, aprovação e publicação temporária em GitHub-hosted runners. Nenhum pacote de origem é armazenado como artefato do controlador público. Metadados de release (SHA e IDs) são públicos.
-- Após um push na master privada com gates verdes, o workflow source-only gera o pacote DEV. O controlador verifica periodicamente o pacote **concluído**. Não há PAT de escrita entre os repositórios. O receipt impede repetir o mesmo SHA ou desfazer uma promoção manual de PR. O proprietário pode reexecutar manualmente um release após falha.
+- Após a integração da PR #252 na origem, um push na master privada com gates verdes prepara os artefatos DEV e PROD juntos, no mesmo run de empacotamento privado. O controlador verifica periodicamente o pacote **concluído**. Não há PAT de escrita entre os repositórios. O receipt impede repetir o mesmo SHA ou desfazer uma promoção manual de PR. O proprietário pode reexecutar manualmente um release após falha.
 - PROD continua exigindo o SHA atual, gates, pacote verificável e as aprovações cloudflare-production e firebase-production.
 - A extração confere o digest do pacote e a revisão exata dos scripts de publicação, lockfiles e configurações que serão usados com credenciais. Alterações nesses arquivos exigem revisão própria no controlador. Worker compilado, conteúdo estático e migrações seguem suas verificações de release e ambiente.
 - Os jobs legados da origem que dependem dos environments de publicação são guardados contra execução privada. Não remover suas validações de PR.
@@ -36,15 +36,15 @@ Após a virada, basta mergear o PR autorizado. O runner precisa estar online. Pa
 
 ### CI consolidada
 
-A origem executa um workflow de CI por PR com três checks. A preparação gera um pacote por ambiente solicitado e continua automática para DEV após os checks de um push na master. O controlador mantém a aceitação das revisões anteriores durante a transição. Integre a revisão dos blobs no controlador antes de integrar os workflows da origem.
+A origem passa a executar um workflow de CI por PR e push na master com cinco checks a partir da PR #252. O empacotamento automático prepara os dois destinos no mesmo run, com instalação compartilhada, arquivos e configuração separados, e retenção de sete dias. O controlador mantém a aceitação das revisões anteriores durante a transição. Integre a revisão dos blobs no controlador antes de integrar os workflows da origem.
 
 Testes de PR do controlador e verificações de identidade têm grupos de concorrência próprios. As publicações ficam em fila por ambiente e compartilham o grupo PROD com a manutenção de contas de QA.
 
 ### Release manual / PR
 
-1. Na origem: `release-package.yml`, ref `master`, sha completo e target `dev` ou `prod`.
-2. Para PR aberto: ref = branch exata do PR, `target=dev`, `sha=PR head SHA`, `pr_number` = número. A revisão do workflow e os três gates do PR devem ser aprovados; atualizar o branch com master se necessário.
-3. No controlador: `firebase-release.yml`, operation `release`, target `development` ou `production`, sha e package_run_id. PRs só DEV, com `confirmation=PUBLICAR_PR_DEV` e pr_number. Em PROD: `confirmation=DEPLOY ROTEIVA PROD` e aprovar os environments. As opções `frontend_only`, `worker_only` (DEV) e `firestore_only` (DEV) são mutuamente exclusivas.
+1. Na origem: aguarde os checks verdes e o `release-package.yml` automático da master; anote seu run ID. Se necessário (artefato expirado, configuração alterada ou ausência de pacote), dispare manualmente `release-package.yml`, ref `master`, SHA completo e `target=both`, `dev` ou `prod`.
+2. Para PR aberto: ref = branch exata do PR, `target=dev`, `sha=PR head SHA`, `pr_number` = número. A revisão do workflow e os cinco gates do PR (ou os três da revisão anterior) devem ser aprovados; atualizar o branch com master se necessário.
+3. No controlador: `firebase-release.yml`, operation `release`, target `development` ou `production`, sha e package_run_id. PRs só DEV, com `confirmation=PUBLICAR_PR_DEV` e pr_number. Em PROD: após confirmar DEV, reutilize o `package_run_id` do empacotamento conjunto da master, com `confirmation=DEPLOY ROTEIVA PROD` e aprovação dos environments. O controlador escolhe o artefato PROD correspondente, não o binário DEV. As opções `frontend_only`, `worker_only` (DEV) e `firestore_only` (DEV) são mutuamente exclusivas.
 4. Preview: `operation=preview`, target development, PR e confirmação acima. Publica canal temporário pr-N, não modifica Worker ou Hosting ao vivo.
 5. Site institucional: pacote prod de master, operation `site`, target production, `confirmation=DEPLOY ROTEIVA SITE`. Publica apenas o site institucional. O modo requer homologação real quando utilizado, com aprovação PROD.
 6. Redação dos logs: operation `observability`, target production, `confirmation=APLICAR REDACAO PROD`. Usa pacote prod e ambiente protegido; não republica Worker.
