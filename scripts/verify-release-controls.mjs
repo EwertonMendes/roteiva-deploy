@@ -16,6 +16,8 @@ const approved = {
     '5aa99e06691964172ac4a4b5603de56196d30923a83077f57ba80274f9c3a1a9',
     // Source PR #257: invocation logs at 100%, query-string redaction and traces sampled at 1%.
     'a5d1d5b44756cbddc17b6f646575eef0577529da9a500e5e3ef55f40737bed40',
+    // Source PR #261 DEV only: exact additive migration guard for 0049_client_deletion.sql.
+    'c88d52b547f651d9901d74b0a149e8c999430aa4dfb5e25dae58a529378392ed',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
