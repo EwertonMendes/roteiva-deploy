@@ -30,7 +30,7 @@ const approved = {
     // Same exact controls as DEV with the reviewed production Hosting configuration.
     '5eca70bc33658d05662984a1102ce26e3bfbc5ad39f72f06b2d7501b9b564fd7',
     // Source PR #257: same telemetry controls as DEV, with reviewed production Hosting config.
-    '126608d4e9fcef41c942962397d055e68fc17a84a6bb188ec3fa5a8b450164ce',
+    'f423c05f178cb3cf64263e6ecf49408ac6a6652cc237f55d8e6bb743bfb8bbda',
   ],
 };
 
