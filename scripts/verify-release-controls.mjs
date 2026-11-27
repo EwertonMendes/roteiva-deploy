@@ -14,6 +14,8 @@ const approved = {
     '1e0ca9b9c6e271105ae79fbea2f708f89b722456b56d25ee1610f788e9ced1ad',
     // Adds isolated PROD Queue bindings and pins the additive deletion checkpoint/budget migration.
     '5aa99e06691964172ac4a4b5603de56196d30923a83077f57ba80274f9c3a1a9',
+    // Source PR #257: invocation logs at 100%, query-string redaction and traces sampled at 1%.
+    'a5d1d5b44756cbddc17b6f646575eef0577529da9a500e5e3ef55f40737bed40',
   ],
   prod: [
     '688c83854902ac52c30503d4e8dabf880dbbf87ac84950b3882ba5c99450d150',
@@ -27,6 +29,8 @@ const approved = {
     '6eb01d59689c3294235c4cc255232a4eeae79768b192b9b9b6e9bccf39d1eb88',
     // Same exact controls as DEV with the reviewed production Hosting configuration.
     '5eca70bc33658d05662984a1102ce26e3bfbc5ad39f72f06b2d7501b9b564fd7',
+    // Source PR #257: same telemetry controls as DEV, with reviewed production Hosting config.
+    '126608d4e9fcef41c942962397d055e68fc17a84a6bb188ec3fa5a8b450164ce',
   ],
 };
 
