@@ -12,6 +12,15 @@ export async function selectDevRelease({api,liveIdentity,manual=false,verify=ver
  const branch=await api('/branches/master'),sha=branch.commit?.sha;
  if(!/^[a-f0-9]{40}$/.test(sha||''))throw Error('Invalid master SHA');
  if(liveIdentity?.environment==='dev'&&liveIdentity?.projectId==='roteiva-web-dev'&&liveIdentity?.sha===sha)return null;
+ // A manual PR homologation owns DEV until that PR closes or an explicit
+ // manual release replaces it. An unrelated master merge must never
+ // downgrade an in-flight destructive job to a Worker without its routes.
+ if(!manual){
+  if(liveIdentity?.environment!=='dev'||liveIdentity?.projectId!=='roteiva-web-dev'||! /^[a-f0-9]{40}$/.test(liveIdentity?.sha||''))throw Error('Cannot verify current DEV identity');
+  const prs=await api('/commits/'+liveIdentity.sha+'/pulls?per_page=100');
+  if(!Array.isArray(prs)||prs.length>=100)throw Error('Cannot verify DEV homologation ownership');
+  if(prs.some(pr=>pr.state==='open'&&pr.base?.ref==='master'&&pr.base?.repo?.id===SOURCE_ID&&pr.head?.repo?.id===SOURCE_ID))return null;
+ }
  if(!manual&&await alreadyAttempted(sha))return null;
  const query=new URLSearchParams({branch:'master',head_sha:sha,status:'success',per_page:'30'});
  const data=await api('/actions/workflows/428402383/runs?'+query);

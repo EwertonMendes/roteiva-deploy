@@ -8,6 +8,7 @@ function fixture(options={}){
   calls.push(path);
   if(path==='')return {id:1422595328,full_name:'EwertonMendes/roteiva-web',default_branch:'master',private:options.private??true};
   if(path==='/branches/master')return {commit:{sha}};
+  if(path.startsWith('/commits/')&&path.endsWith('/pulls?per_page=100'))return options.livePrs??[];
   if(path.startsWith('/actions/workflows/428402383/runs?'))return {workflow_runs:[{id:100001,head_sha:sha,head_branch:'master',status:'completed',conclusion:'success',event:options.event||'workflow_run'}]};
   if(path.startsWith('/actions/runs/100001/artifacts'))return {artifacts:[{name:'roteiva-release-'+(options.target||'dev')+'-'+sha,expired:options.expired??false}]};
   throw Error('Unexpected API request');
@@ -45,4 +46,19 @@ test('scheduled controller never overwrites an explicitly promoted PR after mast
  assert.ok(!f.calls.includes('verify'));
  const manual=fixture();
  assert.deepEqual(await selectDevRelease({...manual,manual:true,alreadyAttempted:async()=>true}),{sha,packageRunId:100001});
+});
+
+test('scheduled DEV must not overwrite an open PR even when a newer master package exists',async()=>{
+ const pr={state:'open',base:{ref:'master',repo:{id:1422595328}},head:{repo:{id:1422595328}}};
+ const f=fixture({livePrs:[pr]});
+ assert.equal(await selectDevRelease(f),null);
+ assert.ok(!f.calls.some(p=>p.startsWith('/actions/')));
+ const closed=fixture({livePrs:[{...pr,state:'closed'}]});
+ assert.deepEqual(await selectDevRelease(closed),{sha,packageRunId:100001});
+ const manual=fixture({livePrs:[pr]});
+ assert.deepEqual(await selectDevRelease({...manual,manual:true}),{sha,packageRunId:100001});
+});
+test('malformed live identity fails closed for automated publication',async()=>{
+ const f=fixture();
+ await assert.rejects(()=>selectDevRelease({...f,liveIdentity:{environment:'prod',projectId:'roteiva-web-dev',sha:old}}),/current DEV identity/);
 });
