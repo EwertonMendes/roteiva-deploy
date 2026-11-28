@@ -33,6 +33,8 @@ const approved = {
     '5eca70bc33658d05662984a1102ce26e3bfbc5ad39f72f06b2d7501b9b564fd7',
     // Source PR #257: same telemetry controls as DEV, with reviewed production Hosting config.
     'f423c05f178cb3cf64263e6ecf49408ac6a6652cc237f55d8e6bb743bfb8bbda',
+    // Source PR #261: exact independently reviewed 0049 additive migration guard, production package.
+    '5ecfc89583fc226d5ab312b70c830b7ec917f70ae89c83d7b72b0c66959f7568',
   ],
 };
 
