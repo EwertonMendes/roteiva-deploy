@@ -37,6 +37,8 @@ const approved = {
     'f423c05f178cb3cf64263e6ecf49408ac6a6652cc237f55d8e6bb743bfb8bbda',
     // Source PR #261: exact independently reviewed 0049 additive migration guard, production package.
     '5ecfc89583fc226d5ab312b70c830b7ec917f70ae89c83d7b72b0c66959f7568',
+    // Source PR #262: exact reviewed 0050 additive migration guard, production package.
+    '91da2268789961837d72c3b5746bc7a414f9a1e7b6408924f22e63a8d20ff4e9',
   ],
 };
 
